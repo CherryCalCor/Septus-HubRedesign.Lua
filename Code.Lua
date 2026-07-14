@@ -2629,37 +2629,14 @@ do
     local consoleTog, _, setConsoleState = createToggle(OtherMenu, "Developer Console", 0, false, function(st) ConsoleWin.Visible = st end)
     conCloseBtn.MouseButton1Click:Connect(function() setConsoleState(false, true); ConsoleWin.Visible = false end)
 
-    local SpyWin = Create("Frame", { Parent = UI.Screen, Size = UDim2.new(0, 440, 0, 240), Position = UDim2.new(0.5, -220, 0.5, -120), BackgroundColor3 = Colors.Background, BorderSizePixel = 0, Visible = false, ClipsDescendants = true })
-    Create("UICorner", { Parent = SpyWin, CornerRadius = UDim.new(0, 8) })
-    Create("UIStroke", { Parent = SpyWin, Color = Colors.Border, Thickness = 1 })
-    local spyTopBar = Create("Frame", { Parent = SpyWin, Size = UDim2.new(1, 0, 0, 34), BackgroundTransparency = 1 })
-    makeDraggable(SpyWin, spyTopBar)
-    Create("TextLabel", { Parent = spyTopBar, Size = UDim2.new(0.6, 0, 1, 0), Position = UDim2.new(0, 15, 0, 0), BackgroundTransparency = 1, Text = "Remote Spy", TextColor3 = Colors.TextMain, Font = Enum.Font.GothamBold, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left })
-    local spyCloseBtn = Create("TextButton", { Parent = spyTopBar, Size = UDim2.new(0, 24, 0, 24), Position = UDim2.new(1, -30, 0.5, -12), BackgroundTransparency = 1, Text = "×", TextColor3 = Colors.TextDim, Font = Enum.Font.GothamMedium, TextSize = 18 })
-
-    local spyScroll = Create("ScrollingFrame", { Parent = SpyWin, Size = UDim2.new(1, -24, 1, -48), Position = UDim2.new(0, 12, 0, 38), BackgroundTransparency = 1, ScrollBarThickness = 2, ScrollBarImageColor3 = Colors.Border, BorderSizePixel = 0 })
-    local spyLayout2 = Create("UIListLayout", { Parent = spyScroll, Padding = UDim.new(0, 3) })
-    spyLayout2:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function() spyScroll.CanvasSize = UDim2.new(0, 0, 0, spyLayout2.AbsoluteContentSize.Y + 10) end)
-
-    local function logRemote(remoteName, method, argsCount)
-        local lbl = Create("TextLabel", { Parent = spyScroll, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, Text = string.format("[%s] %s | Args: %d", method, tostring(remoteName), argsCount), TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, Font = Enum.Font.Gotham, TextSize = 11, TextColor3 = Color3.fromRGB(240, 180, 255) })
-        task.wait()
-        spyScroll.CanvasPosition = Vector2.new(0, spyScroll.CanvasSize.Y.Offset)
-    end
-
-    local spyEnabled = false
-    local spyTog, _, setSpyState = createToggle(OtherMenu, "Remote Spy", 44, false, function(st) spyEnabled = st; SpyWin.Visible = st end)
-    spyCloseBtn.MouseButton1Click:Connect(function() setSpyState(false, true); SpyWin.Visible = false end)
-
-    local oldNamecall
-    oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
-        local method = getnamecallmethod()
-        if spyEnabled and not checkcaller() and (method == "FireServer" or method == "InvokeServer") then
-            local args = {...}
-            task.spawn(function() logRemote(self.Name, method, #args) end)
+local spyEnabled = false
+    local spyTog, _, setSpyState = createToggle(OtherMenu, "Remote Spy", 44, false, function(st)
+        spyEnabled = st
+        if st then
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/CherryCalCor/BWSPY.Lua/refs/heads/main/Code"))()
         end
-        return oldNamecall(self, ...)
     end)
+
 end
 
 do
@@ -3486,12 +3463,19 @@ blurEffect.Size = 0
 blurEffect.Name = "SeptusBlur"
 
 local isGuiVisible = false
+local isMinimized = false
+
 ToggleBtn.MouseButton1Click:Connect(function()
     isGuiVisible = not isGuiVisible
     if isGuiVisible then
         UI.Frame.Visible = true
-        Services.TS:Create(UI.Frame, TWEEN_INFO_SMOOTH, { Size = UDim2.new(0, 520, 0, 340), Position = UDim2.new(0.5, -260, 0.5, -170), BackgroundTransparency = 0 }):Play()
-        Services.TS:Create(blurEffect, TWEEN_INFO_SMOOTH, { Size = 15 }):Play()
+
+        local targetSize = isMinimized and UDim2.new(0, 520, 0, 38) or UDim2.new(0, 520, 0, 340)
+        local targetBlur = isMinimized and 0 or 15
+        
+        Services.TS:Create(UI.Frame, TWEEN_INFO_SMOOTH, { Size = targetSize, Position = UDim2.new(0.5, -260, 0.5, -170), BackgroundTransparency = 0 }):Play()
+        Services.TS:Create(blurEffect, TWEEN_INFO_SMOOTH, { Size = targetBlur }):Play()
+        ContentFrame.Visible = not isMinimized
     else
         local shrink = Services.TS:Create(UI.Frame, TWEEN_INFO_SMOOTH, { Size = UDim2.new(0, 0, 0, 0), Position = UDim2.new(0.5, 0, 0.5, 0) })
         Services.TS:Create(blurEffect, TWEEN_INFO_SMOOTH, { Size = 0 }):Play()
@@ -3501,14 +3485,17 @@ ToggleBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-local isMinimized = false
 MinBtn.MouseButton1Click:Connect(function()
     isMinimized = not isMinimized
     if isMinimized then
+
         Services.TS:Create(UI.Frame, TWEEN_INFO_SMOOTH, { Size = UDim2.new(0, 520, 0, 38) }):Play()
+        Services.TS:Create(blurEffect, TWEEN_INFO_SMOOTH, { Size = 0 }):Play()
         ContentFrame.Visible = false
     else
+
         Services.TS:Create(UI.Frame, TWEEN_INFO_SMOOTH, { Size = UDim2.new(0, 520, 0, 340) }):Play()
+        Services.TS:Create(blurEffect, TWEEN_INFO_SMOOTH, { Size = 15 }):Play()
         ContentFrame.Visible = true
     end
 end)
