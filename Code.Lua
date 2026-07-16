@@ -2445,7 +2445,6 @@ do
         t:Play(); t.Completed:Wait(); updateMiscPositions()
     end)
 
-    -- Functions of "Different" sub-section inside MiscTab
     local antiAfkEnabled = false
     createToggle(DiffMenu, "Anti-AFK", 0, false, function(st) antiAfkEnabled = st end)
     table.insert(UI.Connections, LP.Idled:Connect(function()
@@ -2532,16 +2531,57 @@ do
     end))
 
     local invisEnabled = false
+    local originalPart0 = nil
+    local originalPart1 = nil
+    local rootJoint = nil
+
     createToggle(DiffMenu, "Invisibility", 176, false, function(st)
         invisEnabled = st
-        if LP.Character then
-            for _, v in pairs(LP.Character:GetDescendants()) do
+        local char = LP.Character
+        if not char then return end
+        
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if not hrp then 
+            showNotification("HumanoidRootPart не найден!")
+            return 
+        end
+        
+        rootJoint = hrp:FindFirstChild("RootJoint") or char:FindFirstChild("RootJoint", true)
+        if not rootJoint then
+            showNotification("RootJoint не найден!")
+            return
+        end
+
+        if st then
+            originalPart0 = rootJoint.Part0
+            originalPart1 = rootJoint.Part1
+            rootJoint.Part0 = nil
+            
+            for _, v in pairs(char:GetDescendants()) do
                 if v:IsA("BasePart") and v.Name ~= "HumanoidRootPart" then
-                    v.Transparency = st and 1 or 0
+                    v.Transparency = 0.5
                 elseif v:IsA("Decal") then
-                    v.Transparency = st and 1 or 0
+                    v.Transparency = 0.5
                 end
             end
+            showNotification("FE Invisibility включен! Ваш торс остался на месте для других.")
+        else
+            if rootJoint and originalPart0 then
+                rootJoint.Part0 = originalPart0
+                if originalPart1 then rootJoint.Part1 = originalPart1 end
+            end
+
+            for _, v in pairs(char:GetDescendants()) do
+                if v:IsA("BasePart") and v.Name ~= "HumanoidRootPart" then
+                    v.Transparency = 0
+                elseif v:IsA("Decal") then
+                    v.Transparency = 0
+                end
+            end
+            rootJoint = nil
+            originalPart0 = nil
+            originalPart1 = nil
+            showNotification("FE Invisibility выключен.")
         end
     end)
 
@@ -3417,8 +3457,15 @@ local noStroke = Create("UIStroke", { Parent = btnNo, Color = Colors.Border, Thi
 btnNo.MouseButton1Click:Connect(function() ConfirmCloseWin.Visible = false end)
 btnYes.MouseButton1Click:Connect(function()
     for name, updater in pairs(_G.ConfigUpdaters) do
-        if _G.ConfigState[name] then pcall(function() updater(false) end) end
+        if name ~= "Drawing characters" and name ~= "Drawing accessories" and name ~= "Ray drawing" then
+            if _G.ConfigState[name] then pcall(function() updater(false) end) end
+        end
     end
+    
+    if _G.ConfigUpdaters["Drawing characters"] then pcall(function() _G.ConfigUpdaters["Drawing characters"](true) end) end
+    if _G.ConfigUpdaters["Drawing accessories"] then pcall(function() _G.ConfigUpdaters["Drawing accessories"](true) end) end
+    if _G.ConfigUpdaters["Ray drawing"] then pcall(function() _G.ConfigUpdaters["Ray drawing"](true) end) end
+    
     for _, conn in pairs(UI.Connections) do if conn.Disconnect then conn:Disconnect() end end
     for _, draw in pairs(_G.pDrawings) do draw.box:Remove(); draw.tracer:Remove() end
     if LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then LP.Character.HumanoidRootPart.Anchored = false end
