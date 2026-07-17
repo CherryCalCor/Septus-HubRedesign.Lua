@@ -7,7 +7,7 @@
 ### v2.32 Fix Update
 - [ ] Bug fixes with settings
 - [ ] ESP optimization for computer injectors
-
+- [ ] Adding a new ScriptBlox tab
 
 #### v2.33 
 - [ ] BunnyHop function in misc
