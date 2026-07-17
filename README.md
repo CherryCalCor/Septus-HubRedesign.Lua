@@ -22,7 +22,7 @@
 
 ### ⚙️ Как использовать
 ```lua
-loadstring(game:HttpGet("https://raw.githubusercontent.com/CherryCalCor/Septus-HubRedesign.Lua/refs/heads/main/Code.Lua"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/CherryCalCor/Septus-HubRedesign/refs/heads/main/Code.Lua"))()
 ```
 
 # 📚 Documentation
