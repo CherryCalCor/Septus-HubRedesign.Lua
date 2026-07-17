@@ -3332,11 +3332,1103 @@ do
     end)
 end
 
+
+
 local isFlinging = false
 local currentFlingTarget = nil
 local FlingWin, FlingClose, FlingScroll, FlingLayout, FlingActionBtn, FlingActionLbl = createFloatingMenu("Fling")
 createToggle(FunnyTab, "Fling Target", 145, false, function(st)
-    FlingWin.Visible = st
+    FlingWin.Visible = stlocal ScriptBloxPage = Create("Frame", {
+    Name = "ScriptBloxTab",
+    Parent = TabContainer,
+    Size = UDim2.new(1, 0, 1, 0),
+    BackgroundTransparency = 1,
+    Visible = false
+})
+UI.Pages["ScriptBlox"] = ScriptBloxPage
+
+CreateTabButton("ScriptBlox", 14)
+
+local CacheManager = {
+    Cache = {},
+    Favorites = {},
+    History = {}
+}
+
+function CacheManager.Get(key)
+    return CacheManager.Cache[key]
+end
+
+function CacheManager.Set(key, value)
+    CacheManager.Cache[key] = value
+end
+
+function CacheManager.LoadFavorites()
+    pcall(function()
+        if isfile and isfile("SeptusHub_Configs/sb_favorites.json") then
+            CacheManager.Favorites = Services.Http:JSONDecode(readfile("SeptusHub_Configs/sb_favorites.json"))
+        end
+    end)
+end
+
+function CacheManager.SaveFavorites()
+    pcall(function()
+        if writefile then
+            if not isfolder("SeptusHub_Configs") then
+                makefolder("SeptusHub_Configs")
+            end
+            writefile("SeptusHub_Configs/sb_favorites.json", Services.Http:JSONEncode(CacheManager.Favorites))
+        end
+    end)
+end
+
+function CacheManager.ToggleFavorite(scriptData)
+    local id = scriptData._id
+    if CacheManager.Favorites[id] then
+        CacheManager.Favorites[id] = nil
+        showNotification("Removed from favorites!")
+    else
+        CacheManager.Favorites[id] = scriptData
+        showNotification("Added to favorites!")
+    end
+    CacheManager.SaveFavorites()
+end
+
+function CacheManager.IsFavorite(id)
+    return CacheManager.Favorites[id] ~= nil
+end
+
+function CacheManager.AddToHistory(query)
+    if not query or query == "" then return end
+    for i, v in ipairs(CacheManager.History) do
+        if v == query then
+            table.remove(CacheManager.History, i)
+            break
+        end
+    end
+    table.insert(CacheManager.History, 1, query)
+    if #CacheManager.History > 10 then
+        table.remove(CacheManager.History)
+    end
+end
+
+local APIModule = {
+    BaseUrl = "https://scriptblox.com/api"
+}
+
+local function requestHttp(url)
+    local success, response = pcall(function()
+        if request then
+            local res = request({
+                Url = url,
+                Method = "GET"
+            })
+            return res.Body
+        else
+            return game:HttpGetAsync(url)
+        end
+    end)
+    if success then
+        return response
+    else
+        return nil, response
+    end
+end
+
+function APIModule.Search(query, page, filters)
+    page = page or 1
+    local url = APIModule.BaseUrl .. "/script/search?q=" .. Services.Http:UrlEncode(query) .. "&page=" .. tostring(page) .. "&max=10"
+    
+    if filters.mode and filters.mode ~= "all" then
+        url = url .. "&mode=" .. filters.mode
+    end
+    if filters.key ~= nil then
+        url = url .. "&key=" .. tostring(filters.key)
+    end
+    if filters.verified ~= nil then
+        url = url .. "&verified=" .. tostring(filters.verified)
+    end
+    if filters.isUniversal ~= nil then
+        url = url .. "&universal=" .. tostring(filters.isUniversal)
+    end
+    if filters.sortBy then
+        url = url .. "&sortBy=" .. filters.sortBy .. "&order=desc"
+    end
+
+    local cacheKey = url
+    local cached = CacheManager.Get(cacheKey)
+    if cached then return cached end
+
+    local body, err = requestHttp(url)
+    if not body then
+        return nil, err or "HTTP Request failed"
+    end
+
+    local success, data = pcall(function()
+        return Services.Http:JSONDecode(body)
+    end)
+
+    if not success then
+        return nil, "JSON Decode failed"
+    end
+
+    if data and data.result then
+        CacheManager.Set(cacheKey, data.result)
+        return data.result
+    elseif data and data.message then
+        return nil, data.message
+    else
+        return nil, "Invalid response structure"
+    end
+end
+
+function APIModule.FetchRawScript(scriptId)
+    local url = APIModule.BaseUrl .. "/script/raw/" .. scriptId
+    local body, err = requestHttp(url)
+    return body, err
+end
+
+local TopSearchBar = Create("Frame", {
+    Parent = ScriptBloxPage,
+    Size = UDim2.new(1, 0, 0, 40),
+    Position = UDim2.new(0, 0, 0, 0),
+    BackgroundTransparency = 1
+})
+
+local SearchBoxCard = Create("Frame", {
+    Parent = TopSearchBar,
+    Size = UDim2.new(1, -120, 1, 0),
+    BackgroundColor3 = Colors.Surface,
+    BorderSizePixel = 0
+})
+Create("UICorner", { Parent = SearchBoxCard, CornerRadius = UDim.new(0, 6) })
+local searchStroke = Create("UIStroke", { Parent = SearchBoxCard, Color = Colors.Border, Thickness = 1 })
+
+local SearchInput = Create("TextBox", {
+    Parent = SearchBoxCard,
+    Size = UDim2.new(1, -20, 1, 0),
+    Position = UDim2.new(0, 10, 0, 0),
+    BackgroundTransparency = 1,
+    TextColor3 = Colors.TextMain,
+    PlaceholderText = "Search scripts by name, game or PlaceId...",
+    Font = Enum.Font.Gotham,
+    TextSize = 12,
+    Text = "",
+    ClearTextOnFocus = false
+})
+
+local SearchBtn = Create("TextButton", {
+    Parent = TopSearchBar,
+    Size = UDim2.new(0, 75, 1, 0),
+    Position = UDim2.new(1, -115, 0, 0),
+    BackgroundColor3 = Colors.Active,
+    Text = "Search",
+    TextColor3 = Colors.Background,
+    Font = Enum.Font.GothamBold,
+    TextSize = 12,
+    BorderSizePixel = 0
+})
+Create("UICorner", { Parent = SearchBtn, CornerRadius = UDim.new(0, 6) })
+
+local RefreshBtn = Create("TextButton", {
+    Parent = TopSearchBar,
+    Size = UDim2.new(0, 35, 1, 0),
+    Position = UDim2.new(1, -35, 0, 0),
+    BackgroundColor3 = Colors.Surface,
+    Text = "🔄",
+    TextColor3 = Colors.TextMain,
+    Font = Enum.Font.GothamBold,
+    TextSize = 14,
+    BorderSizePixel = 0
+})
+Create("UICorner", { Parent = RefreshBtn, CornerRadius = UDim.new(0, 6) })
+local refreshStroke = Create("UIStroke", { Parent = RefreshBtn, Color = Colors.Border, Thickness = 1 })
+
+local FilterBar = Create("Frame", {
+    Parent = ScriptBloxPage,
+    Size = UDim2.new(1, 0, 0, 30),
+    Position = UDim2.new(0, 0, 0, 45),
+    BackgroundTransparency = 1
+})
+
+local FiltersToggleBtn = Create("TextButton", {
+    Parent = FilterBar,
+    Size = UDim2.new(0, 80, 1, 0),
+    BackgroundColor3 = Colors.Surface,
+    Text = "⚡ Filters",
+    TextColor3 = Colors.TextMain,
+    Font = Enum.Font.GothamBold,
+    TextSize = 11,
+    BorderSizePixel = 0
+})
+Create("UICorner", { Parent = FiltersToggleBtn, CornerRadius = UDim.new(0, 6) })
+local filtersStroke = Create("UIStroke", { Parent = FiltersToggleBtn, Color = Colors.Border, Thickness = 1 })
+
+local FavToggleBtn = Create("TextButton", {
+    Parent = FilterBar,
+    Size = UDim2.new(0, 90, 1, 0),
+    Position = UDim2.new(0, 85, 0, 0),
+    BackgroundColor3 = Colors.Surface,
+    Text = "⭐ Favorites",
+    TextColor3 = Colors.TextMain,
+    Font = Enum.Font.GothamBold,
+    TextSize = 11,
+    BorderSizePixel = 0
+})
+Create("UICorner", { Parent = FavToggleBtn, CornerRadius = UDim.new(0, 6) })
+local favToggleStroke = Create("UIStroke", { Parent = FavToggleBtn, Color = Colors.Border, Thickness = 1 })
+
+local HistoryToggleBtn = Create("TextButton", {
+    Parent = FilterBar,
+    Size = UDim2.new(0, 80, 1, 0),
+    Position = UDim2.new(0, 180, 0, 0),
+    BackgroundColor3 = Colors.Surface,
+    Text = "🕒 History",
+    TextColor3 = Colors.TextMain,
+    Font = Enum.Font.GothamBold,
+    TextSize = 11,
+    BorderSizePixel = 0
+})
+Create("UICorner", { Parent = HistoryToggleBtn, CornerRadius = UDim.new(0, 6) })
+local historyToggleStroke = Create("UIStroke", { Parent = HistoryToggleBtn, Color = Colors.Border, Thickness = 1 })
+
+local SortDisplay = Create("TextLabel", {
+    Parent = FilterBar,
+    Size = UDim2.new(1, -270, 1, 0),
+    Position = UDim2.new(0, 265, 0, 0),
+    BackgroundTransparency = 1,
+    Text = "Sort: Views",
+    TextColor3 = Colors.TextDim,
+    Font = Enum.Font.GothamSemibold,
+    TextSize = 11,
+    TextXAlignment = Enum.TextXAlignment.Right
+})
+
+local FiltersPanel = Create("Frame", {
+    Parent = ScriptBloxPage,
+    Size = UDim2.new(1, 0, 0, 160),
+    Position = UDim2.new(0, 0, 0, 80),
+    BackgroundColor3 = Colors.Background,
+    BorderSizePixel = 0,
+    Visible = false,
+    ZIndex = 50
+})
+Create("UICorner", { Parent = FiltersPanel, CornerRadius = UDim.new(0, 8) })
+local filtersPanelStroke = Create("UIStroke", { Parent = FiltersPanel, Color = Colors.Active, Thickness = 1 })
+
+local activeFilters = {
+    mode = "all",
+    key = nil,
+    verified = nil,
+    isUniversal = nil,
+    sortBy = "views"
+}
+
+local function createFilterRow(parent, labelText, posY, options, filterKey, defaultValue)
+    Create("TextLabel", {
+        Parent = parent,
+        Size = UDim2.new(0, 80, 0, 22),
+        Position = UDim2.new(0, 10, 0, posY),
+        BackgroundTransparency = 1,
+        Text = labelText,
+        TextColor3 = Colors.TextDim,
+        Font = Enum.Font.GothamSemibold,
+        TextSize = 11,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        ZIndex = 51
+    })
+
+    local optionButtons = {}
+    local startX = 90
+    for _, opt in ipairs(options) do
+        local btn = Create("TextButton", {
+            Parent = parent,
+            Size = UDim2.new(0, opt.width or 65, 0, 22),
+            Position = UDim2.new(0, startX, 0, posY),
+            BackgroundColor3 = Colors.Surface,
+            Text = opt.display,
+            TextColor3 = Colors.TextDim,
+            Font = Enum.Font.GothamMedium,
+            TextSize = 10,
+            BorderSizePixel = 0,
+            ZIndex = 51
+        })
+        Create("UICorner", { Parent = btn, CornerRadius = UDim.new(0, 4) })
+        local bStroke = Create("UIStroke", { Parent = btn, Color = Colors.Border, Thickness = 1 })
+
+        local function selectOption()
+            for _, otherBtn in ipairs(optionButtons) do
+                otherBtn.btn.BackgroundColor3 = Colors.Surface
+                otherBtn.btn.TextColor3 = Colors.TextDim
+                otherBtn.stroke.Color = Colors.Border
+            end
+            btn.BackgroundColor3 = Colors.Active
+            btn.TextColor3 = Colors.Background
+            bStroke.Color = Colors.Active
+            activeFilters[filterKey] = opt.value
+            
+            if filterKey == "sortBy" then
+                SortDisplay.Text = "Sort: " .. opt.display
+            end
+        end
+
+        if opt.value == defaultValue then
+            selectOption()
+        end
+
+        btn.MouseButton1Click:Connect(selectOption)
+        table.insert(optionButtons, { btn = btn, stroke = bStroke })
+        startX = startX + (opt.width or 65) + 6
+    end
+end
+
+createFilterRow(FiltersPanel, "Cost", 10, {
+    { display = "All", value = "all" },
+    { display = "Free", value = "free" },
+    { display = "Paid", value = "paid" }
+}, "mode", "all")
+
+createFilterRow(FiltersPanel, "Key System", 40, {
+    { display = "All", value = nil },
+    { display = "Yes", value = true },
+    { display = "No", value = false }
+}, "key", nil)
+
+createFilterRow(FiltersPanel, "Verified Only", 70, {
+    { display = "All", value = nil },
+    { display = "Yes", value = true },
+    { display = "No", value = false }
+}, "verified", nil)
+
+createFilterRow(FiltersPanel, "Sort By", 100, {
+    { display = "Views", value = "views" },
+    { display = "Likes", value = "likeCount" },
+    { display = "Newest", value = "createdAt" }
+}, "sortBy", "views")
+
+createFilterRow(FiltersPanel, "Universal", 130, {
+    { display = "All", value = nil },
+    { display = "Yes", value = true },
+    { display = "No", value = false }
+}, "isUniversal", nil)
+
+local ResultsScroll = Create("ScrollingFrame", {
+    Parent = ScriptBloxPage,
+    Size = UDim2.new(1, 0, 1, -115),
+    Position = UDim2.new(0, 0, 0, 80),
+    BackgroundTransparency = 1,
+    ScrollBarThickness = 2,
+    ScrollBarImageColor3 = Colors.Border,
+    BorderSizePixel = 0,
+    ClipsDescendants = true
+})
+local resultsLayout = Create("UIListLayout", {
+    Parent = ResultsScroll,
+    SortOrder = Enum.SortOrder.LayoutOrder,
+    Padding = UDim.new(0, 8)
+})
+
+resultsLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    ResultsScroll.CanvasSize = UDim2.new(0, 0, 0, resultsLayout.AbsoluteContentSize.Y + 10)
+end)
+
+local PaginationBar = Create("Frame", {
+    Parent = ScriptBloxPage,
+    Size = UDim2.new(1, 0, 0, 30),
+    Position = UDim2.new(0, 0, 1, -30),
+    BackgroundTransparency = 1
+})
+
+local PrevBtn = Create("TextButton", {
+    Parent = PaginationBar,
+    Size = UDim2.new(0, 60, 1, 0),
+    BackgroundColor3 = Colors.Surface,
+    Text = "◀ Prev",
+    TextColor3 = Colors.TextMain,
+    Font = Enum.Font.GothamBold,
+    TextSize = 11,
+    BorderSizePixel = 0
+})
+Create("UICorner", { Parent = PrevBtn, CornerRadius = UDim.new(0, 6) })
+local prevStroke = Create("UIStroke", { Parent = PrevBtn, Color = Colors.Border, Thickness = 1 })
+
+local NextBtn = Create("TextButton", {
+    Parent = PaginationBar,
+    Size = UDim2.new(0, 60, 1, 0),
+    Position = UDim2.new(1, -60, 0, 0),
+    BackgroundColor3 = Colors.Surface,
+    Text = "Next ▶",
+    TextColor3 = Colors.TextMain,
+    Font = Enum.Font.GothamBold,
+    TextSize = 11,
+    BorderSizePixel = 0
+})
+Create("UICorner", { Parent = NextBtn, CornerRadius = UDim.new(0, 6) })
+local nextStroke = Create("UIStroke", { Parent = NextBtn, Color = Colors.Border, Thickness = 1 })
+
+local PageLabel = Create("TextLabel", {
+    Parent = PaginationBar,
+    Size = UDim2.new(1, -130, 1, 0),
+    Position = UDim2.new(0, 65, 0, 0),
+    BackgroundTransparency = 1,
+    Text = "Page 1",
+    TextColor3 = Colors.TextMain,
+    Font = Enum.Font.GothamBold,
+    TextSize = 12
+})
+
+local HistoryPanel = Create("Frame", {
+    Parent = ScriptBloxPage,
+    Size = UDim2.new(1, 0, 1, -80),
+    Position = UDim2.new(0, 0, 0, 80),
+    BackgroundColor3 = Colors.Background,
+    BorderSizePixel = 0,
+    Visible = false,
+    ZIndex = 40
+})
+Create("UICorner", { Parent = HistoryPanel, CornerRadius = UDim.new(0, 8) })
+
+local historyScroll = Create("ScrollingFrame", {
+    Parent = HistoryPanel,
+    Size = UDim2.new(1, -20, 1, -20),
+    Position = UDim2.new(0, 10, 0, 10),
+    BackgroundTransparency = 1,
+    ScrollBarThickness = 2,
+    ScrollBarImageColor3 = Colors.Border,
+    BorderSizePixel = 0
+})
+local historyLayout = Create("UIListLayout", { Parent = historyScroll, Padding = UDim.new(0, 6) })
+
+local function refreshHistoryUI()
+    for _, child in ipairs(historyScroll:GetChildren()) do
+        if child:IsA("TextButton") then child:Destroy() end
+    end
+    if #CacheManager.History == 0 then
+        local emptyLbl = Create("TextLabel", {
+            Parent = historyScroll,
+            Size = UDim2.new(1, 0, 0, 30),
+            BackgroundTransparency = 1,
+            Text = "Search history is empty",
+            TextColor3 = Colors.TextDim,
+            Font = Enum.Font.GothamMedium,
+            TextSize = 12
+        })
+    else
+        for _, q in ipairs(CacheManager.History) do
+            local btn = Create("TextButton", {
+                Parent = historyScroll,
+                Size = UDim2.new(1, -6, 0, 30),
+                BackgroundColor3 = Colors.Surface,
+                Text = q,
+                TextColor3 = Colors.TextMain,
+                Font = Enum.Font.GothamMedium,
+                TextSize = 12,
+                BorderSizePixel = 0
+            })
+            Create("UICorner", { Parent = btn, CornerRadius = UDim.new(0, 4) })
+            local bStroke = Create("UIStroke", { Parent = btn, Color = Colors.Border, Thickness = 1 })
+
+            btn.MouseButton1Click:Connect(function()
+                SearchInput.Text = q
+                HistoryPanel.Visible = false
+                HistoryToggleBtn.BackgroundColor3 = Colors.Surface
+                HistoryToggleBtn.TextColor3 = Colors.TextMain
+                _G.PerformScriptBloxSearch(q)
+            end)
+        end
+    end
+end
+
+local showingFavorites = false
+
+local function renderFavorites()
+    ResultsScroll:ClearAllChildren()
+    local count = 0
+    for _, scriptData in pairs(CacheManager.Favorites) do
+        count = count + 1
+        _G.CreateScriptCard(scriptData)
+    end
+    if count == 0 then
+        local emptyLbl = Create("TextLabel", {
+            Parent = ResultsScroll,
+            Size = UDim2.new(1, 0, 0, 50),
+            BackgroundTransparency = 1,
+            Text = "No favorite scripts.",
+            TextColor3 = Colors.TextDim,
+            Font = Enum.Font.GothamMedium,
+            TextSize = 12
+        })
+    end
+    PageLabel.Text = "Favorites (" .. count .. ")"
+    PrevBtn.Visible = false
+    NextBtn.Visible = false
+end
+
+local LoaderLabel = Create("TextLabel", {
+    Parent = ScriptBloxPage,
+    Size = UDim2.new(1, 0, 0, 40),
+    Position = UDim2.new(0, 0, 0.5, -20),
+    BackgroundTransparency = 1,
+    Text = "Fetching scripts...",
+    TextColor3 = Colors.Active,
+    Font = Enum.Font.GothamBold,
+    TextSize = 13,
+    Visible = false,
+    ZIndex = 10
+})
+
+local function setLoaderState(active)
+    LoaderLabel.Visible = active
+    ResultsScroll.Visible = not active
+end
+
+local function openScriptDetails(scriptData)
+    local title = scriptData.title or "Script Details"
+    local win, closeBtn, scroll, layout, actionBtn, actionLbl = createFloatingMenu(title, 380, 360)
+    win.Visible = true
+    win.Position = UDim2.new(0.5, -190, 0.5, -180)
+
+    local function addDetailLine(key, val)
+        local l = Create("TextLabel", {
+            Parent = scroll,
+            Size = UDim2.new(1, -6, 0, 18),
+            BackgroundTransparency = 1,
+            Text = "<b>" .. key .. "</b>: " .. tostring(val),
+            TextColor3 = Colors.TextMain,
+            Font = Enum.Font.Gotham,
+            TextSize = 11,
+            RichText = true,
+            TextXAlignment = Enum.TextXAlignment.Left
+        })
+    end
+
+    addDetailLine("Game", scriptData.game and scriptData.game.name or "Universal")
+    addDetailLine("Author", scriptData.owner and scriptData.owner.username or "Anonymous")
+    addDetailLine("Views", scriptData.views or 0)
+    addDetailLine("Likes", scriptData.likeCount or 0)
+    addDetailLine("Key System", scriptData.key and "Yes" or "No")
+    addDetailLine("Created", tostring(scriptData.createdAt):sub(1, 10))
+
+    if scriptData.features and scriptData.features ~= "" then
+        local descHeader = Create("TextLabel", {
+            Parent = scroll,
+            Size = UDim2.new(1, -6, 0, 20),
+            BackgroundTransparency = 1,
+            Text = "<b>Features:</b>",
+            TextColor3 = Colors.Active,
+            Font = Enum.Font.GothamBold,
+            TextSize = 11,
+            RichText = true,
+            TextXAlignment = Enum.TextXAlignment.Left
+        })
+        
+        local descBox = Create("TextLabel", {
+            Parent = scroll,
+            Size = UDim2.new(1, -6, 0, 0),
+            AutomaticSize = Enum.AutomaticSize.Y,
+            BackgroundTransparency = 1,
+            Text = scriptData.features,
+            TextColor3 = Colors.TextDim,
+            Font = Enum.Font.Gotham,
+            TextSize = 11,
+            TextWrapped = true,
+            TextXAlignment = Enum.TextXAlignment.Left
+        })
+    end
+
+    local codeHeader = Create("TextLabel", {
+        Parent = scroll,
+        Size = UDim2.new(1, -6, 0, 20),
+        BackgroundTransparency = 1,
+        Text = "<b>Script Code:</b>",
+        TextColor3 = Colors.Active,
+        Font = Enum.Font.GothamBold,
+        TextSize = 11,
+        RichText = true,
+        TextXAlignment = Enum.TextXAlignment.Left
+    })
+
+    local codeContainer = Create("Frame", {
+        Parent = scroll,
+        Size = UDim2.new(1, -6, 0, 120),
+        BackgroundColor3 = Colors.ToggleShell,
+        BorderSizePixel = 0
+    })
+    Create("UICorner", { Parent = codeContainer, CornerRadius = UDim.new(0, 6) })
+    Create("UIStroke", { Parent = codeContainer, Color = Colors.Border, Thickness = 1 })
+
+    local codeScroll = Create("ScrollingFrame", {
+        Parent = codeContainer,
+        Size = UDim2.new(1, -12, 1, -12),
+        Position = UDim2.new(0, 6, 0, 6),
+        BackgroundTransparency = 1,
+        ScrollBarThickness = 3,
+        ScrollBarImageColor3 = Colors.Border,
+        BorderSizePixel = 0,
+        CanvasSize = UDim2.new(0, 0, 0, 0)
+    })
+    
+    local codeText = scriptData.script or ""
+    if codeText == "" and scriptData._id then
+        task.spawn(function()
+            local raw, err = APIModule.FetchRawScript(scriptData._id)
+            if raw then
+                codeText = raw
+                scriptData.script = raw
+            end
+        end)
+    end
+
+    local codeBox = Create("TextBox", {
+        Parent = codeScroll,
+        Size = UDim2.new(1, 0, 1, 0),
+        BackgroundTransparency = 1,
+        TextColor3 = Color3.fromRGB(180, 255, 180),
+        Font = Enum.Font.Code,
+        TextSize = 10,
+        Text = codeText,
+        ClearTextOnFocus = false,
+        MultiLine = true,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        TextYAlignment = Enum.TextYAlignment.Top,
+        ReadOnly = true
+    })
+    codeBox:GetPropertyChangedSignal("TextBounds"):Connect(function()
+        codeScroll.CanvasSize = UDim2.new(0, codeBox.TextBounds.X + 20, 0, codeBox.TextBounds.Y + 20)
+    end)
+
+    actionLbl.Text = "Execute Script"
+    actionBtn.MouseButton1Click:Connect(function()
+        if codeText ~= "" then
+            local func, err = loadstring(codeText)
+            if func then
+                task.spawn(func)
+                showNotification("Script executed!")
+            else
+                showNotification("Syntax error: " .. tostring(err))
+            end
+        else
+            showNotification("Loading script code...")
+        end
+    end)
+
+    local copyBtn = Create("TextButton", {
+        Parent = win,
+        Size = UDim2.new(0, 100, 0, 30),
+        Position = UDim2.new(1, -110, 1, -40),
+        BackgroundColor3 = Colors.Surface,
+        Text = "Copy Code",
+        TextColor3 = Colors.TextMain,
+        Font = Enum.Font.GothamBold,
+        TextSize = 11,
+        BorderSizePixel = 0,
+        ZIndex = 10
+    })
+    Create("UICorner", { Parent = copyBtn, CornerRadius = UDim.new(0, 6) })
+    local copyStroke = Create("UIStroke", { Parent = copyBtn, Color = Colors.Border, Thickness = 1 })
+
+    copyBtn.MouseButton1Click:Connect(function()
+        if codeText ~= "" then
+            pcall(function()
+                if setclipboard then setclipboard(codeText) elseif toclipboard then toclipboard(codeText) end
+            end)
+            showNotification("Code copied to clipboard!")
+        end
+    end)
+
+    closeBtn.MouseButton1Click:Connect(function()
+        win:Destroy()
+    end)
+end
+
+_G.CreateScriptCard = function(scriptData)
+    local cardHeight = 115
+    local card = CreateStyledCard(ResultsScroll, cardHeight)
+    card.Size = UDim2.new(1, -6, 0, cardHeight)
+
+    local titleLbl = Create("TextLabel", {
+        Parent = card,
+        Size = UDim2.new(1, -40, 0, 20),
+        Position = UDim2.new(0, 10, 0, 8),
+        BackgroundTransparency = 1,
+        Text = scriptData.title or "Untitled Script",
+        TextColor3 = Colors.TextMain,
+        Font = Enum.Font.GothamBold,
+        TextSize = 12,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        ClipsDescendants = true
+    })
+
+    local isFav = CacheManager.IsFavorite(scriptData._id)
+    local favBtn = Create("TextButton", {
+        Parent = card,
+        Size = UDim2.new(0, 24, 0, 24),
+        Position = UDim2.new(1, -30, 0, 6),
+        BackgroundTransparency = 1,
+        Text = isFav and "⭐" or "☆",
+        TextColor3 = Colors.Active,
+        Font = Enum.Font.GothamBold,
+        TextSize = 14
+    })
+    favBtn.MouseButton1Click:Connect(function()
+        CacheManager.ToggleFavorite(scriptData)
+        favBtn.Text = CacheManager.IsFavorite(scriptData._id) and "⭐" or "☆"
+    end)
+
+    local gameName = scriptData.game and scriptData.game.name or "Universal"
+    local authorName = scriptData.owner and scriptData.owner.username or "Anonymous"
+    
+    local metaLbl = Create("TextLabel", {
+        Parent = card,
+        Size = UDim2.new(1, -20, 0, 16),
+        Position = UDim2.new(0, 10, 0, 28),
+        BackgroundTransparency = 1,
+        Text = "Game: " .. gameName .. " | Author: " .. authorName,
+        TextColor3 = Colors.TextDim,
+        Font = Enum.Font.GothamMedium,
+        TextSize = 10,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        ClipsDescendants = true
+    })
+
+    local badgeLayout = Create("Frame", {
+        Parent = card,
+        Size = UDim2.new(1, -20, 0, 18),
+        Position = UDim2.new(0, 10, 0, 48),
+        BackgroundTransparency = 1
+    })
+    local bList = Create("UIListLayout", { Parent = badgeLayout, FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 4) })
+
+    local function addBadge(text, color)
+        local b = Create("Frame", { Parent = badgeLayout, Size = UDim2.new(0, 0, 1, 0), AutomaticSize = Enum.AutomaticSize.X, BackgroundColor3 = color })
+        Create("UICorner", { Parent = b, CornerRadius = UDim.new(0, 4) })
+        local t = Create("TextLabel", { Parent = b, Size = UDim2.new(1, 0, 1, 0), Position = UDim2.new(0,0,0,0), BackgroundTransparency = 1, Text = " " .. text .. " ", TextColor3 = Colors.Background, Font = Enum.Font.GothamBold, TextSize = 8 })
+    end
+
+    if scriptData.verified then addBadge("Verified", Color3.fromRGB(80, 200, 80)) end
+    if scriptData.key then addBadge("Key System", Color3.fromRGB(220, 100, 100)) else addBadge("No Key", Color3.fromRGB(100, 180, 220)) end
+    if scriptData.isUniversal then addBadge("Universal", Color3.fromRGB(150, 100, 220)) end
+    if scriptData.scriptType == "paid" then addBadge("Paid", Color3.fromRGB(220, 180, 50)) else addBadge("Free", Color3.fromRGB(100, 200, 100)) end
+
+    local views = scriptData.views or 0
+    local likes = scriptData.likeCount or 0
+    local statsLbl = Create("TextLabel", {
+        Parent = card,
+        Size = UDim2.new(0.4, 0, 0, 16),
+        Position = UDim2.new(0, 10, 1, -24),
+        BackgroundTransparency = 1,
+        Text = "👁 " .. views .. "  👍 " .. likes,
+        TextColor3 = Colors.TextDim,
+        Font = Enum.Font.GothamMedium,
+        TextSize = 10,
+        TextXAlignment = Enum.TextXAlignment.Left
+    })
+
+    local function makeCardBtn(text, posX, width, color, callback)
+        local btn = Create("TextButton", {
+            Parent = card,
+            Size = UDim2.new(0, width, 0, 22),
+            Position = UDim2.new(1, posX, 1, -26),
+            BackgroundColor3 = color,
+            Text = text,
+            TextColor3 = color == Colors.Active and Colors.Background or Colors.TextMain,
+            Font = Enum.Font.GothamBold,
+            TextSize = 9,
+            BorderSizePixel = 0
+        })
+        Create("UICorner", { Parent = btn, CornerRadius = UDim.new(0, 4) })
+        local bStroke = Create("UIStroke", { Parent = btn, Color = Colors.Border, Thickness = 1 })
+
+        btn.MouseButton1Click:Connect(callback)
+        return btn
+    end
+
+    local codeText = scriptData.script or ""
+    local function getCode(cb)
+        if codeText ~= "" then
+            cb(codeText)
+        elseif scriptData._id then
+            task.spawn(function()
+                local raw, err = APIModule.FetchRawScript(scriptData._id)
+                if raw then
+                    codeText = raw
+                    scriptData.script = raw
+                    cb(raw)
+                else
+                    showNotification("Failed to fetch script source")
+                end
+            end)
+        end
+    end
+
+    makeCardBtn("Details", -210, 55, Colors.Surface, function()
+        openScriptDetails(scriptData)
+    end)
+
+    makeCardBtn("Copy", -150, 45, Colors.Surface, function()
+        getCode(function(code)
+            pcall(function()
+                if setclipboard then setclipboard(code) elseif toclipboard then toclipboard(code) end
+            end)
+            showNotification("Code copied to clipboard!")
+        end)
+    end)
+
+    makeCardBtn("Execute", -100, 90, Colors.Active, function()
+        getCode(function(code)
+            local func, err = loadstring(code)
+            if func then
+                task.spawn(func)
+                showNotification("Executing script...")
+            else
+                showNotification("Execution error: " .. tostring(err))
+            end
+        end)
+    end)
+
+    card.Size = UDim2.new(1, -6, 0, 0)
+    card.ClipsDescendants = true
+    Services.TS:Create(card, TWEEN_INFO_FAST, { Size = UDim2.new(1, -6, 0, cardHeight) }):Play()
+end
+
+local SearchController = {
+    CurrentQuery = "",
+    CurrentPage = 1,
+    TotalPages = 1,
+    IsLoading = false,
+    DebounceTime = 0.5,
+    LastSearchTime = 0
+}
+
+function SearchController.Search(query, page)
+    if SearchController.IsLoading then return end
+    
+    local now = os.clock()
+    if now - SearchController.LastSearchTime < SearchController.DebounceTime then
+        showNotification("Please wait before searching again")
+        return
+    end
+    SearchController.LastSearchTime = now
+
+    SearchController.IsLoading = true
+    setLoaderState(true)
+    ResultsScroll:ClearAllChildren()
+
+    SearchController.CurrentQuery = query
+    SearchController.CurrentPage = page or 1
+
+    task.spawn(function()
+        local results, err = APIModule.Search(query, SearchController.CurrentPage, activeFilters)
+        SearchController.IsLoading = false
+        setLoaderState(false)
+
+        if not results then
+            local errLbl = Create("TextLabel", {
+                Parent = ResultsScroll,
+                Size = UDim2.new(1, 0, 0, 50),
+                BackgroundTransparency = 1,
+                Text = "Error: " .. tostring(err),
+                TextColor3 = Color3.fromRGB(255, 100, 100),
+                Font = Enum.Font.GothamMedium,
+                TextSize = 12
+            })
+            return
+        end
+
+        SearchController.TotalPages = results.totalPages or 1
+        PageLabel.Text = "Page " .. SearchController.CurrentPage .. " of " .. SearchController.TotalPages
+
+        if not results.scripts or #results.scripts == 0 then
+            local emptyLbl = Create("TextLabel", {
+                Parent = ResultsScroll,
+                Size = UDim2.new(1, 0, 0, 50),
+                BackgroundTransparency = 1,
+                Text = "No scripts found.",
+                TextColor3 = Colors.TextDim,
+                Font = Enum.Font.GothamMedium,
+                TextSize = 12
+            })
+            return
+        end
+
+        for _, scriptData in ipairs(results.scripts) do
+            _G.CreateScriptCard(scriptData)
+        end
+
+        CacheManager.AddToHistory(query)
+    end)
+end
+
+_G.PerformScriptBloxSearch = function(query)
+    showingFavorites = false
+    FavToggleBtn.BackgroundColor3 = Colors.Surface
+    FavToggleBtn.TextColor3 = Colors.TextMain
+    PrevBtn.Visible = true
+    NextBtn.Visible = true
+    SearchController.Search(query, 1)
+end
+
+SearchBtn.MouseButton1Click:Connect(function()
+    _G.PerformScriptBloxSearch(SearchInput.Text)
+end)
+
+SearchInput.FocusLost:Connect(function(enterPressed)
+    if enterPressed then
+        _G.PerformScriptBloxSearch(SearchInput.Text)
+    end
+end)
+
+RefreshBtn.MouseButton1Click:Connect(function()
+    if showingFavorites then
+        renderFavorites()
+    else
+        SearchController.Search(SearchController.CurrentQuery, SearchController.CurrentPage)
+    end
+end)
+
+FiltersToggleBtn.MouseButton1Click:Connect(function()
+    FiltersPanel.Visible = not FiltersPanel.Visible
+    if FiltersPanel.Visible then
+        FiltersToggleBtn.BackgroundColor3 = Colors.Active
+        FiltersToggleBtn.TextColor3 = Colors.Background
+        HistoryPanel.Visible = false
+        HistoryToggleBtn.BackgroundColor3 = Colors.Surface
+        HistoryToggleBtn.TextColor3 = Colors.TextMain
+    else
+        FiltersToggleBtn.BackgroundColor3 = Colors.Surface
+        FiltersToggleBtn.TextColor3 = Colors.TextMain
+    end
+end)
+
+FavToggleBtn.MouseButton1Click:Connect(function()
+    showingFavorites = not showingFavorites
+    if showingFavorites then
+        FavToggleBtn.BackgroundColor3 = Colors.Active
+        FavToggleBtn.TextColor3 = Colors.Background
+        HistoryPanel.Visible = false
+        HistoryToggleBtn.BackgroundColor3 = Colors.Surface
+        HistoryToggleBtn.TextColor3 = Colors.TextMain
+        FiltersPanel.Visible = false
+        FiltersToggleBtn.BackgroundColor3 = Colors.Surface
+        FiltersToggleBtn.TextColor3 = Colors.TextMain
+        renderFavorites()
+    else
+        FavToggleBtn.BackgroundColor3 = Colors.Surface
+        FavToggleBtn.TextColor3 = Colors.TextMain
+        _G.PerformScriptBloxSearch(SearchInput.Text)
+    end
+end)
+
+HistoryToggleBtn.MouseButton1Click:Connect(function()
+    HistoryPanel.Visible = not HistoryPanel.Visible
+    if HistoryPanel.Visible then
+        HistoryToggleBtn.BackgroundColor3 = Colors.Active
+        HistoryToggleBtn.TextColor3 = Colors.Background
+        FiltersPanel.Visible = false
+        FiltersToggleBtn.BackgroundColor3 = Colors.Surface
+        FiltersToggleBtn.TextColor3 = Colors.TextMain
+        refreshHistoryUI()
+    else
+        HistoryToggleBtn.BackgroundColor3 = Colors.Surface
+        HistoryToggleBtn.TextColor3 = Colors.TextMain
+    end
+end)
+
+PrevBtn.MouseButton1Click:Connect(function()
+    if SearchController.CurrentPage > 1 then
+        SearchController.Search(SearchController.CurrentQuery, SearchController.CurrentPage - 1)
+    end
+end)
+
+NextBtn.MouseButton1Click:Connect(function()
+    if SearchController.CurrentPage < SearchController.TotalPages then
+        SearchController.Search(SearchController.CurrentQuery, SearchController.CurrentPage + 1)
+    end
+end)
+
+CacheManager.LoadFavorites()
+
+local SuggestionContainer = Create("Frame", {
+    Parent = ScriptBloxPage,
+    Size = UDim2.new(1, -120, 0, 0),
+    Position = UDim2.new(0, 0, 0, 42),
+    BackgroundColor3 = Colors.Surface,
+    BorderSizePixel = 0,
+    Visible = false,
+    ZIndex = 100
+})
+Create("UICorner", { Parent = SuggestionContainer, CornerRadius = UDim.new(0, 6) })
+local suggStroke = Create("UIStroke", { Parent = SuggestionContainer, Color = Colors.Border, Thickness = 1 })
+
+local suggLayout = Create("UIListLayout", { Parent = SuggestionContainer, Padding = UDim.new(0, 2) })
+
+local suggestionsPool = { "Blox Fruits", "Arsenal", "Doors", "Brookhaven", "Adopt Me", "Infinite Yield", "Fly", "Aimbot", "ESP", "Murder Mystery 2" }
+
+local function showSuggestions(text)
+    if text == "" then
+        SuggestionContainer.Visible = false
+        return
+    end
+
+    for _, v in pairs(SuggestionContainer:GetChildren()) do
+        if v:IsA("TextButton") then v:Destroy() end
+    end
+
+    local count = 0
+    local tLower = text:lower()
+    local added = {}
+    
+    local function addSugBtn(sugg)
+        if count >= 5 or added[sugg] then return end
+        added[sugg] = true
+        count = count + 1
+        local btn = Create("TextButton", {
+            Parent = SuggestionContainer,
+            Size = UDim2.new(1, 0, 0, 24),
+            BackgroundTransparency = 1,
+            Text = "  " .. sugg,
+            TextColor3 = Colors.TextMain,
+            Font = Enum.Font.GothamMedium,
+            TextSize = 11,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            ZIndex = 101
+        })
+        btn.MouseButton1Click:Connect(function()
+            SearchInput.Text = sugg
+            SuggestionContainer.Visible = false
+            _G.PerformScriptBloxSearch(sugg)
+        end)
+    end
+
+    for _, q in ipairs(CacheManager.History) do
+        if q:lower():find(tLower) then
+            addSugBtn(q)
+        end
+    end
+
+    for _, sugg in ipairs(suggestionsPool) do
+        if sugg:lower():find(tLower) then
+            addSugBtn(sugg)
+        end
+    end
+
+    if count > 0 then
+        SuggestionContainer.Size = UDim2.new(1, -120, 0, count * 24 + 4)
+        SuggestionContainer.Visible = true
+    else
+        SuggestionContainer.Visible = false
+    end
+end
+
+SearchInput:GetPropertyChangedSignal("Text"):Connect(function()
+    showSuggestions(SearchInput.Text)
+end)
+
+SearchInput.FocusLost:Connect(function()
+    task.delay(0.2, function()
+        SuggestionContainer.Visible = false
+    end)
+end)
     if st then populatePlayers(FlingScroll, FlingLayout, FlingActionLbl, "Fling", function(p) currentFlingTarget = p end) end
 end)
 FlingClose.MouseButton1Click:Connect(function() FlingWin.Visible = false end)
