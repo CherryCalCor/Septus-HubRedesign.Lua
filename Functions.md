@@ -147,3 +147,9 @@
 · Map render distance (Ползунок дальности прорисовки)
 · Watermark (Водяной знак в углу)
 · Old design (Вкл/Выкл старого дизайна меню)
+
+
+Раздел:ScriptBlox
+
+· Поиск нужного скрипта прямо из ScriptBlox прямо в скрипте
+· Favorite Scripts
