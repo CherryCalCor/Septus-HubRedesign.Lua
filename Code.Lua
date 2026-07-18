@@ -4904,7 +4904,13 @@ _G.SearchEmotes = function(query)
     })
 
     task.spawn(function()
+
         local url = "https://catalog.roproxy.com/v1/search/items/details?Category=12&Subcategory=39&SortType=" .. tostring(currentSortType) .. "&Limit=30"
+        
+        if currentSortType == 1 or currentSortType == 2 then
+            url = url .. "&SortAggregation=5"
+        end
+
         if query and query ~= "" then
             url = url .. "&Keyword=" .. Services.Http:UrlEncode(query)
         end
@@ -4939,11 +4945,16 @@ _G.SearchEmotes = function(query)
         end)
 
         if not decodeSuccess or not decoded or not decoded.data then
+
+            local errMsg = "Ошибка обработки данных."
+            if decoded and decoded.errors and decoded.errors[1] then
+                errMsg = errMsg .. " (" .. tostring(decoded.errors[1].message) .. ")"
+            end
             Create("TextLabel", {
                 Parent = EmotesScroll,
                 Size = UDim2.new(1, 0, 0, 50),
                 BackgroundTransparency = 1,
-                Text = "Ошибка обработки данных.",
+                Text = errMsg,
                 TextColor3 = Color3.fromRGB(255, 100, 100),
                 Font = Enum.Font.GothamMedium,
                 TextSize = 12
