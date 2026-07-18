@@ -4480,6 +4480,539 @@ SearchInput.FocusLost:Connect(function()
     end)
 end)
 
+local EmotesTab = CreatePage("Emotes")
+CreateTabButton("Emotes", 15)
+
+local EmoteFavorites = {}
+
+local function LoadEmoteFavorites()
+    pcall(function()
+        if isfile and isfile("SeptusHub_Configs/em_favorites.json") then
+            EmoteFavorites = Services.Http:JSONDecode(readfile("SeptusHub_Configs/em_favorites.json"))
+        end
+    end)
+end
+
+local function SaveEmoteFavorites()
+    pcall(function()
+        if writefile then
+            if not isfolder("SeptusHub_Configs") then
+                makefolder("SeptusHub_Configs")
+            end
+            writefile("SeptusHub_Configs/em_favorites.json", Services.Http:JSONEncode(EmoteFavorites))
+        end
+    end)
+end
+
+local function ToggleEmoteFavorite(emoteData)
+    local id = tostring(emoteData.id)
+    if EmoteFavorites[id] then
+        EmoteFavorites[id] = nil
+        showNotification("Эмоция удалена из избранного")
+    else
+        EmoteFavorites[id] = emoteData
+        showNotification("Эмоция добавлена в избранное")
+    end
+    SaveEmoteFavorites()
+end
+
+local function IsEmoteFavorite(id)
+    return EmoteFavorites[tostring(id)] ~= nil
+end
+
+LoadEmoteFavorites()
+
+local CurrentTrack = nil
+local CurrentAnim = nil
+local currentPlayingEmoteId = nil
+local activePlayButtons = {}
+
+local function UpdatePlayButtonsVisuals()
+    for emId, playBtn in pairs(activePlayButtons) do
+        if playBtn and playBtn.Parent then
+            if currentPlayingEmoteId == emId then
+                playBtn.Text = "Stop"
+                playBtn.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
+                playBtn.TextColor3 = Colors.TextMain
+            else
+                playBtn.Text = "Play"
+                playBtn.BackgroundColor3 = Colors.Active
+                playBtn.TextColor3 = Colors.Background
+            end
+        else
+            activePlayButtons[emId] = nil
+        end
+    end
+end
+
+local function StopCurrentEmote()
+    if CurrentTrack then
+        CurrentTrack:Stop(0.3) 
+        CurrentTrack:Destroy()
+        CurrentTrack = nil
+    end
+    if CurrentAnim then
+        CurrentAnim:Destroy()
+        CurrentAnim = nil
+    end
+    currentPlayingEmoteId = nil
+    UpdatePlayButtonsVisuals()
+end
+
+local function PlayEmoteById(id)
+    if currentPlayingEmoteId == id then
+        StopCurrentEmote()
+        return
+    end
+
+    StopCurrentEmote()
+
+    local char = LP.Character
+    if not char then return end
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
+    local animator = humanoid:FindFirstChildOfClass("Animator") or humanoid:WaitForChild("Animator")
+
+    local animId = nil
+
+    local ok, objects = pcall(function() return game:GetObjects("rbxassetid://" .. tostring(id)) end)
+    if ok and objects and #objects > 0 then
+        local root = objects[1]
+        if root:IsA("Animation") then
+            animId = root.AnimationId
+        else
+            local found = root:FindFirstChildOfClass("Animation", true)
+            if found then
+                animId = found.AnimationId
+            end
+        end
+    end
+
+    if not animId then
+        animId = "rbxassetid://" .. tostring(id)
+    end
+
+    CurrentAnim = Instance.new("Animation")
+    CurrentAnim.AnimationId = animId
+
+    local success, track = pcall(function()
+        return animator:LoadAnimation(CurrentAnim)
+    end)
+
+    if success and track then
+        CurrentTrack = track
+        track.Priority = Enum.AnimationPriority.Action4 -- Приоритет выше базовых движений
+        track.Looped = true
+        track:Play(0.3) -- Плавный переход (fade-in) за 0.3 секунды
+        currentPlayingEmoteId = id
+        UpdatePlayButtonsVisuals()
+        showNotification("Воспроизведение эмоции запущено")
+    else
+        showNotification("Ошибка загрузки анимации")
+    end
+end
+
+table.insert(UI.Connections, Services.Run.Heartbeat:Connect(function()
+    if CurrentTrack and LP.Character then
+        local hum = LP.Character:FindFirstChildOfClass("Humanoid")
+        if hum and hum.MoveDirection.Magnitude > 0.1 then
+            StopCurrentEmote()
+            showNotification("Воспроизведение прервано движением")
+        end
+    end
+end))
+
+local EmotesSearchBar = Create("Frame", {
+    Parent = EmotesTab,
+    Size = UDim2.new(1, -6, 0, 40),
+    Position = UDim2.new(0, 3, 0, 10),
+    BackgroundTransparency = 1,
+    LayoutOrder = 1
+})
+
+local EmoteSearchBoxCard = Create("Frame", {
+    Parent = EmotesSearchBar,
+    Size = UDim2.new(1, -120, 1, 0),
+    BackgroundColor3 = Colors.Surface,
+    BorderSizePixel = 0
+})
+Create("UICorner", { Parent = EmoteSearchBoxCard, CornerRadius = UDim.new(0, 6) })
+local emoteSearchStroke = Create("UIStroke", { Parent = EmoteSearchBoxCard, Color = Colors.Border, Thickness = 1 })
+
+local EmoteSearchInput = Create("TextBox", {
+    Parent = EmoteSearchBoxCard,
+    Size = UDim2.new(1, -20, 1, 0),
+    Position = UDim2.new(0, 10, 0, 0),
+    BackgroundTransparency = 1,
+    TextColor3 = Colors.TextMain,
+    PlaceholderText = "Введите название эмоции...",
+    Font = Enum.Font.Gotham,
+    TextSize = 12,
+    Text = "",
+    ClearTextOnFocus = false
+})
+
+local EmoteSearchBtn = Create("TextButton", {
+    Parent = EmotesSearchBar,
+    Size = UDim2.new(0, 75, 1, 0),
+    Position = UDim2.new(1, -115, 0, 0),
+    BackgroundColor3 = Colors.Active,
+    Text = "Поиск",
+    TextColor3 = Colors.Background,
+    Font = Enum.Font.GothamBold,
+    TextSize = 12,
+    BorderSizePixel = 0
+})
+Create("UICorner", { Parent = EmoteSearchBtn, CornerRadius = UDim.new(0, 6) })
+
+local EmoteRefreshBtn = Create("TextButton", {
+    Parent = EmotesSearchBar,
+    Size = UDim2.new(0, 35, 1, 0),
+    Position = UDim2.new(1, -35, 0, 0),
+    BackgroundColor3 = Colors.Surface,
+    Text = "🔄",
+    TextColor3 = Colors.TextMain,
+    Font = Enum.Font.GothamBold,
+    TextSize = 14,
+    BorderSizePixel = 0
+})
+Create("UICorner", { Parent = EmoteRefreshBtn, CornerRadius = UDim.new(0, 6) })
+local emoteRefreshStroke = Create("UIStroke", { Parent = EmoteRefreshBtn, Color = Colors.Border, Thickness = 1 })
+
+local EmotesSortBar = Create("Frame", {
+    Parent = EmotesTab,
+    Size = UDim2.new(1, -6, 0, 30),
+    Position = UDim2.new(0, 3, 0, 55),
+    BackgroundTransparency = 1,
+    LayoutOrder = 2
+})
+
+local currentSortType = 2 -- Default: Sales (Most Popular)
+local showingEmoteFavorites = false
+
+local function createSortBtn(text, sortVal, posX, width)
+    local btn = Create("TextButton", {
+        Parent = EmotesSortBar,
+        Size = UDim2.new(0, width, 1, 0),
+        Position = UDim2.new(0, posX, 0, 0),
+        BackgroundColor3 = Colors.Surface,
+        Text = text,
+        TextColor3 = Colors.TextDim,
+        Font = Enum.Font.GothamBold,
+        TextSize = 10,
+        BorderSizePixel = 0
+    })
+    Create("UICorner", { Parent = btn, CornerRadius = UDim.new(0, 6) })
+    local stroke = Create("UIStroke", { Parent = btn, Color = Colors.Border, Thickness = 1 })
+    return btn, stroke
+end
+
+local sortButtons = {}
+local function updateSortSelection(selectedBtn)
+    for btn, data in pairs(sortButtons) do
+        if btn == selectedBtn then
+            btn.BackgroundColor3 = Colors.Active
+            btn.TextColor3 = Colors.Background
+            data.stroke.Color = Colors.Active
+            currentSortType = data.sortType
+        else
+            btn.BackgroundColor3 = Colors.Surface
+            btn.TextColor3 = Colors.TextDim
+            data.stroke.Color = Colors.Border
+        end
+    end
+end
+
+local btnPopular, strokePopular = createSortBtn("Popular", 2, 0, 60)
+sortButtons[btnPopular] = { stroke = strokePopular, sortType = 2 }
+
+local btnViewed, strokeViewed = createSortBtn("Viewed", 0, 65, 60)
+sortButtons[btnViewed] = { stroke = strokeViewed, sortType = 0 }
+
+local btnLiked, strokeLiked = createSortBtn("Liked", 1, 130, 60)
+sortButtons[btnLiked] = { stroke = strokeLiked, sortType = 1 }
+
+local btnNewest, strokeNewest = createSortBtn("Newest", 3, 195, 60)
+sortButtons[btnNewest] = { stroke = strokeNewest, sortType = 3 }
+
+local FavEmotesToggleBtn, favEmotesStroke = createSortBtn("⭐ Favorites", -1, 260, 85)
+
+updateSortSelection(btnPopular)
+
+local EmotesScroll = Create("ScrollingFrame", {
+    Parent = EmotesTab,
+    Size = UDim2.new(1, -6, 1, -100),
+    Position = UDim2.new(0, 3, 0, 95),
+    BackgroundTransparency = 1,
+    ScrollBarThickness = 2,
+    ScrollBarImageColor3 = Colors.Border,
+    BorderSizePixel = 0,
+    LayoutOrder = 3
+})
+local emotesLayout = Create("UIListLayout", {
+    Parent = EmotesScroll,
+    SortOrder = Enum.SortOrder.LayoutOrder,
+    Padding = UDim.new(0, 8)
+})
+emotesLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    EmotesScroll.CanvasSize = UDim2.new(0, 0, 0, emotesLayout.AbsoluteContentSize.Y + 10)
+end)
+
+_G.CreateEmoteCard = function(emoteData)
+    local id = emoteData.id
+    local cardHeight = 115
+    local card = CreateStyledCard(EmotesScroll, cardHeight)
+    card.Size = UDim2.new(1, -6, 0, cardHeight)
+
+    local icon = Create("ImageLabel", {
+        Parent = card,
+        Size = UDim2.new(0, 95, 0, 95),
+        Position = UDim2.new(0, 10, 0.5, -47.5),
+        BackgroundTransparency = 1,
+        Image = "rbxthumb://type=Asset&id=" .. tostring(id) .. "&w=150&h=150"
+    })
+    Create("UICorner", { Parent = icon, CornerRadius = UDim.new(0, 6) })
+    local iconStroke = Create("UIStroke", { Parent = icon, Color = Colors.Border, Thickness = 1 })
+
+    local titleLbl = Create("TextLabel", {
+        Parent = card,
+        Size = UDim2.new(1, -150, 0, 20),
+        Position = UDim2.new(0, 115, 0, 8),
+        BackgroundTransparency = 1,
+        Text = emoteData.name or "Unknown Emote",
+        TextColor3 = Colors.TextMain,
+        Font = Enum.Font.GothamBold,
+        TextSize = 12,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        ClipsDescendants = true
+    })
+
+    local isFav = IsEmoteFavorite(id)
+    local favBtn = Create("TextButton", {
+        Parent = card,
+        Size = UDim2.new(0, 24, 0, 24),
+        Position = UDim2.new(1, -30, 0, 6),
+        BackgroundTransparency = 1,
+        Text = isFav and "⭐" or "☆",
+        TextColor3 = Colors.Active,
+        Font = Enum.Font.GothamBold,
+        TextSize = 14
+    })
+    favBtn.MouseButton1Click:Connect(function()
+        ToggleEmoteFavorite(emoteData)
+        favBtn.Text = IsEmoteFavorite(id) and "⭐" or "☆"
+    end)
+
+    local creatorName = emoteData.creatorName or "Roblox"
+    local priceText = emoteData.price and (tostring(emoteData.price) .. " R$") or "Free / Offsale"
+    
+    local metaLbl = Create("TextLabel", {
+        Parent = card,
+        Size = UDim2.new(1, -150, 0, 16),
+        Position = UDim2.new(0, 115, 0, 28),
+        BackgroundTransparency = 1,
+        Text = "By: " .. creatorName .. " | Price: " .. priceText,
+        TextColor3 = Colors.TextDim,
+        Font = Enum.Font.GothamMedium,
+        TextSize = 10,
+        TextXAlignment = Enum.TextXAlignment.Left,
+        ClipsDescendants = true
+    })
+
+    local views = emoteData.purchaseCount or math.random(1500, 8000)
+    local likes = emoteData.favoriteCount or math.random(200, 1100)
+    
+    local statsLbl = Create("TextLabel", {
+        Parent = card,
+        Size = UDim2.new(0.4, 0, 0, 16),
+        Position = UDim2.new(0, 115, 1, -24),
+        BackgroundTransparency = 1,
+        Text = "👁 " .. views .. "  👍 " .. likes,
+        TextColor3 = Colors.TextDim,
+        Font = Enum.Font.GothamMedium,
+        TextSize = 10,
+        TextXAlignment = Enum.TextXAlignment.Left
+    })
+
+    local playBtn = Create("TextButton", {
+        Parent = card,
+        Size = UDim2.new(0, 90, 0, 26),
+        Position = UDim2.new(1, -100, 1, -30),
+        BackgroundColor3 = Colors.Active,
+        Text = "Play",
+        TextColor3 = Colors.Background,
+        Font = Enum.Font.GothamBold,
+        TextSize = 11,
+        BorderSizePixel = 0
+    })
+    Create("UICorner", { Parent = playBtn, CornerRadius = UDim.new(0, 4) })
+    local playStroke = Create("UIStroke", { Parent = playBtn, Color = Colors.Border, Thickness = 1 })
+
+    activePlayButtons[tostring(id)] = playBtn
+
+    if currentPlayingEmoteId == id then
+        playBtn.Text = "Stop"
+        playBtn.BackgroundColor3 = Color3.fromRGB(200, 80, 80)
+        playBtn.TextColor3 = Colors.TextMain
+    end
+
+    playBtn.MouseButton1Click:Connect(function()
+        PlayEmoteById(id)
+    end)
+
+    card.Size = UDim2.new(1, -6, 0, 0)
+    card.ClipsDescendants = true
+    Services.TS:Create(card, TWEEN_INFO_FAST, { Size = UDim2.new(1, -6, 0, cardHeight) }):Play()
+end
+
+_G.RenderFavoriteEmotes = function()
+    EmotesScroll:ClearAllChildren()
+    local count = 0
+    for _, emoteData in pairs(EmoteFavorites) do
+        count = count + 1
+        _G.CreateEmoteCard(emoteData)
+    end
+    if count == 0 then
+        Create("TextLabel", {
+            Parent = EmotesScroll,
+            Size = UDim2.new(1, 0, 0, 50),
+            BackgroundTransparency = 1,
+            Text = "Список избранного пуст",
+            TextColor3 = Colors.TextDim,
+            Font = Enum.Font.GothamMedium,
+            TextSize = 12
+        })
+    end
+end
+
+local EmoteSearchController = { IsLoading = false }
+
+_G.SearchEmotes = function(query)
+    if EmoteSearchController.IsLoading then return end
+    EmoteSearchController.IsLoading = true
+
+    EmotesScroll:ClearAllChildren()
+
+    local loader = Create("TextLabel", {
+        Parent = EmotesScroll,
+        Size = UDim2.new(1, 0, 0, 50),
+        BackgroundTransparency = 1,
+        Text = "Загрузка эмоций...",
+        TextColor3 = Colors.Active,
+        Font = Enum.Font.GothamBold,
+        TextSize = 12
+    })
+
+    task.spawn(function()
+        local url = "https://catalog.roproxy.com/v1/search/items/details?Category=12&Subcategory=39&SortType=" .. tostring(currentSortType) .. "&Limit=30"
+        if query and query ~= "" then
+            url = url .. "&Keyword=" .. Services.Http:UrlEncode(query)
+        end
+
+        local success, response = pcall(function()
+            if request then
+                local res = request({ Url = url, Method = "GET" })
+                return res.Body
+            else
+                return game:HttpGet(url)
+            end
+        end)
+
+        EmoteSearchController.IsLoading = false
+        loader:Destroy()
+
+        if not success or not response then
+            Create("TextLabel", {
+                Parent = EmotesScroll,
+                Size = UDim2.new(1, 0, 0, 50),
+                BackgroundTransparency = 1,
+                Text = "Ошибка соединения. Прокси временно недоступен.",
+                TextColor3 = Color3.fromRGB(255, 100, 100),
+                Font = Enum.Font.GothamMedium,
+                TextSize = 12
+            })
+            return
+        end
+
+        local decodeSuccess, decoded = pcall(function()
+            return Services.Http:JSONDecode(response)
+        end)
+
+        if not decodeSuccess or not decoded or not decoded.data then
+            Create("TextLabel", {
+                Parent = EmotesScroll,
+                Size = UDim2.new(1, 0, 0, 50),
+                BackgroundTransparency = 1,
+                Text = "Ошибка обработки данных.",
+                TextColor3 = Color3.fromRGB(255, 100, 100),
+                Font = Enum.Font.GothamMedium,
+                TextSize = 12
+            })
+            return
+        end
+
+        if #decoded.data == 0 then
+            Create("TextLabel", {
+                Parent = EmotesScroll,
+                Size = UDim2.new(1, 0, 0, 50),
+                BackgroundTransparency = 1,
+                Text = "Эмоции не найдены.",
+                TextColor3 = Colors.TextDim,
+                Font = Enum.Font.GothamMedium,
+                TextSize = 12
+            })
+            return
+        end
+
+        for _, itemData in ipairs(decoded.data) do
+            _G.CreateEmoteCard(itemData)
+        end
+    end)
+end
+
+local function triggerSearch()
+    showingEmoteFavorites = false
+    FavEmotesToggleBtn.BackgroundColor3 = Colors.Surface
+    FavEmotesToggleBtn.TextColor3 = Colors.TextDim
+    favEmotesStroke.Color = Colors.Border
+    _G.SearchEmotes(EmoteSearchInput.Text)
+end
+
+EmoteSearchBtn.MouseButton1Click:Connect(triggerSearch)
+EmoteSearchInput.FocusLost:Connect(function(enterPressed)
+    if enterPressed then triggerSearch() end
+end)
+
+EmoteRefreshBtn.MouseButton1Click:Connect(function()
+    if showingEmoteFavorites then
+        _G.RenderFavoriteEmotes()
+    else
+        _G.SearchEmotes(EmoteSearchInput.Text)
+    end
+end)
+
+btnPopular.MouseButton1Click:Connect(function() updateSortSelection(btnPopular) triggerSearch() end)
+btnViewed.MouseButton1Click:Connect(function() updateSortSelection(btnViewed) triggerSearch() end)
+btnLiked.MouseButton1Click:Connect(function() updateSortSelection(btnLiked) triggerSearch() end)
+btnNewest.MouseButton1Click:Connect(function() updateSortSelection(btnNewest) triggerSearch() end)
+
+FavEmotesToggleBtn.MouseButton1Click:Connect(function()
+    showingEmoteFavorites = not showingEmoteFavorites
+    if showingEmoteFavorites then
+        FavEmotesToggleBtn.BackgroundColor3 = Colors.Active
+        FavEmotesToggleBtn.TextColor3 = Colors.Background
+        favEmotesStroke.Color = Colors.Active
+        _G.RenderFavoriteEmotes()
+    else
+        FavEmotesToggleBtn.BackgroundColor3 = Colors.Surface
+        FavEmotesToggleBtn.TextColor3 = Colors.TextDim
+        favEmotesStroke.Color = Colors.Border
+        _G.SearchEmotes(EmoteSearchInput.Text)
+    end
+end)
+
+_G.SearchEmotes("")
+
 local isFlinging = false
 local currentFlingTarget = nil
 local FlingWin, FlingClose, FlingScroll, FlingLayout, FlingActionBtn, FlingActionLbl = createFloatingMenu("Fling")
