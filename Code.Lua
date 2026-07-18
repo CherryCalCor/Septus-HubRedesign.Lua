@@ -908,7 +908,7 @@ local ProtectTab = CreatePage("Protect")
 local FunnyTab = CreatePage("Funny")
 local ConfigTab = CreatePage("Config")
 local QoLTab = CreatePage("QoL")
-local MiscTab = CreatePage("Misc") -- Added Misc
+local MiscTab = CreatePage("Misc") 
 local HelpTab = CreatePage("Help")
 local SettingsTab = CreatePage("Settings")
 
@@ -922,7 +922,7 @@ CreateTabButton("Protect", 7)
 CreateTabButton("Funny", 8)
 CreateTabButton("Config", 9)
 CreateTabButton("QoL", 10)
-CreateTabButton("Misc", 11) -- Placed immediately after QoL (Order 11)
+CreateTabButton("Misc", 11) 
 CreateTabButton("Help", 12)
 CreateTabButton("Settings", 13)
 
@@ -1464,12 +1464,25 @@ do
         end
     end)
 
+  local currentSpectateTarget = nil
     makeActBtn("Spectate", 155, function()
-        if TPPlayer and TPPlayer.Character then
-            local hum = TPPlayer.Character:FindFirstChildOfClass("Humanoid")
-            if hum then
-                workspace.CurrentCamera.CameraSubject = hum
-                showNotification("Наблюдение за " .. TPPlayer.Name)
+        if currentSpectateTarget == TPPlayer then
+  
+            if LP.Character and LP.Character:FindFirstChildOfClass("Humanoid") then
+                workspace.CurrentCamera.CameraSubject = LP.Character:FindFirstChildOfClass("Humanoid")
+            end
+            currentSpectateTarget = nil
+            showNotification("Наблюдение отключено")
+        else
+            if TPPlayer and TPPlayer.Character then
+                local hum = TPPlayer.Character:FindFirstChildOfClass("Humanoid")
+                if hum then
+                    currentSpectateTarget = TPPlayer
+                    workspace.CurrentCamera.CameraSubject = hum
+                    showNotification("Наблюдение за " .. TPPlayer.Name)
+                end
+            else
+                showNotification("Игрок не выбран")
             end
         end
     end)
@@ -1581,12 +1594,22 @@ do
         end
     end))
 
-    local wall = false
+   local wall = false
     createToggle(MovedTab, "Climbing Walls", 175, false, function(st) wall = st end)
     task.spawn(function()
         while task.wait(0.1) do
-            if wall and LP.Character and LP.Character:FindFirstChild("Humanoid") then
-                LP.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Climbing)
+            if wall and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") and LP.Character:FindFirstChild("Humanoid") then
+                local hrp = LP.Character.HumanoidRootPart
+                local hum = LP.Character.Humanoid
+                
+                local raycastParams = RaycastParams.new()
+                raycastParams.FilterDescendantsInstances = {LP.Character}
+                raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+                
+                local raycastResult = workspace:Raycast(hrp.Position, hrp.CFrame.LookVector * 2.5, raycastParams)
+                if raycastResult and raycastResult.Instance.CanCollide then
+                    hum:ChangeState(Enum.HumanoidStateType.Climbing)
+                end
             end
         end
     end)
@@ -1810,13 +1833,38 @@ do
             for _, v in pairs(LP.Character.Head:GetChildren()) do if v:IsA("Decal") then v.Transparency = st and 1 or 0 end end
         end
     end)
+
+local currentKorblox = nil
     createToggle(MiscMenu, "Korblox", 44, false, function(st)
         korblox = st
-        if LP.Character then
-            local leg = LP.Character:FindFirstChild("Right Leg") or LP.Character:FindFirstChild("RightLowerLeg")
-            if leg then leg.Transparency = st and 1 or 0 end
+        local char = LP.Character
+        if not char then return end
+        
+        if currentKorblox then
+            currentKorblox:Destroy()
+            currentKorblox = nil
+        end
+        
+        local legParts = {"Right Leg", "RightLowerLeg", "RightUpperLeg", "RightFoot"}
+        for _, pName in ipairs(legParts) do
+            local part = char:FindFirstChild(pName)
+            if part then
+                part.Transparency = st and 1 or 0
+            end
+        end
+        
+        if st then
+            pcall(function()
+
+                local objects = game:GetObjects("rbxassetid://139607718")
+                if objects and objects[1] then
+                    currentKorblox = objects[1]
+                    currentKorblox.Parent = char
+                end
+            end)
         end
     end)
+
     createToggle(MiscMenu, "Skybox Changer", 88, false, function(st)
         skyboxEnabled = st
         local L = Services.Lighting
@@ -2744,7 +2792,15 @@ do
     local suspEnabled = false
     createToggle(FakeLagMenu, "Complete suspension", 0, false, function(st)
         suspEnabled = st
-        if LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then LP.Character.HumanoidRootPart.Anchored = st end
+        local hum = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
+        if hum then
+            if st then
+                hum.WalkSpeed = 0.5
+            else
+
+                hum.WalkSpeed = _G.ConfigState["Speed"] or 16
+            end
+        end
     end)
 
     local usualEnabled = false
