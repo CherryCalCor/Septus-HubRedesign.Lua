@@ -4904,9 +4904,9 @@ _G.SearchEmotes = function(query)
     })
 
     task.spawn(function()
-        -- Определяем доступную функцию запросов инжектора
+
         local httpReq = request or http_request or (syn and syn.request)
-        -- Если есть внешняя функция запросов, используем официальный домен напрямую, иначе используем прокси
+
         local domain = httpReq and "catalog.roblox.com" or "catalog.roproxy.com"
         local url = "https://" .. domain .. "/v1/search/items/details?Category=12&Subcategory=39&SortType=" .. tostring(currentSortType) .. "&Limit=30"
         
@@ -4920,7 +4920,7 @@ _G.SearchEmotes = function(query)
 
         local success, response = pcall(function()
             if httpReq then
-                -- Отправляем запрос с подменой User-Agent, чтобы Roblox не расценивал его как "In-Experience"
+
                 local res = httpReq({ 
                     Url = url, 
                     Method = "GET",
