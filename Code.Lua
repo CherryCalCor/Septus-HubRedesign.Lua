@@ -2721,7 +2721,7 @@ local spyEnabled = false
     local spyTog, _, setSpyState = createToggle(OtherMenu, "Remote Spy", 44, false, function(st)
         spyEnabled = st
         if st then
-            loadstring(game:HttpGet("https://raw.githubusercontent.com/CherryCalCor/BWSPY.Lua/refs/heads/main/Code"))()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/CherryCalCor/BWSPY.Lua/refs/heads/main/Code.Lua"))()
         end
     end)
 
