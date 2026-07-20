@@ -2929,6 +2929,40 @@ do
                         local airAccelerate = 150 
                         local wishspeed = 30 
 
+local currentspeed = horizontalVel:Dot(wishDir)
+                        local addspeed = wishspeed - currentspeed
+                        if addspeed > 0 then
+                            local accelspeed = math.min(airAccelerate * wishspeed * dt, addspeed)
+                            horizontalVel = horizontalVel + wishDir * accelspeed
+                        end
+
+                        if horizontalVel.Magnitude > maxSpeed then
+                            horizontalVel = horizontalVel.Unit * maxSpeed
+                        end
+                        root.Velocity = Vector3.new(horizontalVel.X, root.Velocity.Y, horizontalVel.Z)
+                    else
+
+                        local accel = 4 * dt
+                        local targetVel = wishDir * math.max(speed, baseWalkSpeed)
+                        horizontalVel = horizontalVel:Lerp(targetVel, accel)
+                        if horizontalVel.Magnitude > maxSpeed then
+                            horizontalVel = horizontalVel.Unit * maxSpeed
+                        end
+                        root.Velocity = Vector3.new(horizontalVel.X, root.Velocity.Y, horizontalVel.Z)
+                    end
+                end
+            end
+        end
+
+        if _G.BhopEnabled then
+            local activeSpeed = math.max(baseWalkSpeed, horizontalVel.Magnitude)
+            hum.WalkSpeed = math.min(activeSpeed, maxSpeed)
+        end
+
+        lastOnGround = onGround
+    end)
+    table.insert(UI.Connections, bhopConnection)
+
     local ConsoleWin = Create("Frame", { Parent = UI.Screen, Size = UDim2.new(0, 440, 0, 240), Position = UDim2.new(0.5, -220, 0.5, -120), BackgroundColor3 = Colors.Background, BorderSizePixel = 0, Visible = false, ClipsDescendants = true })
     Create("UICorner", { Parent = ConsoleWin, CornerRadius = UDim.new(0, 8) })
     Create("UIStroke", { Parent = ConsoleWin, Color = Colors.Border, Thickness = 1 })
