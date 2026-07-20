@@ -104,6 +104,7 @@
   · Free camera
   · Invisibility
   · Cinematic Mode
+  · Bunny Hop
 · Подраздел: Other
   · Developer Console
   · Remote Spy
