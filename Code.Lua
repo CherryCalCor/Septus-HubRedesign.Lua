@@ -617,88 +617,183 @@ end)
 makeDraggable(WelcomeGui)
 repeat task.wait() until welcomeDone
 
-local LoadingFrame = Create("Frame", {
-    Parent = UI.Screen,
-    Size = UDim2.new(0, 460, 0, 260),
-    Position = UDim2.new(0.5, -230, 0.5, -130),
-    BackgroundColor3 = Colors.Background,
-    BorderSizePixel = 0,
-    ZIndex = 60000
-})
-Create("UICorner", { Parent = LoadingFrame, CornerRadius = UDim.new(0, 10) })
-Create("UIStroke", { Parent = LoadingFrame, Color = Colors.Border, Thickness = 1 })
+local TweenService = Services.TS
+local ScreenGui = UI.Screen
+local Lighting = Services.Lighting
+local wRNG = wRNG or Random.new() 
 
-local loadSnow = Create("Frame", { Parent = LoadingFrame, Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, ZIndex = 0 })
+local Blur = Instance.new("BlurEffect")
+Blur.Size = 0
+Blur.Name = "SeptusLoadingBlur"
+Blur.Parent = Lighting
+
+local LoadingFrame = Instance.new("Frame")
+LoadingFrame.Parent = ScreenGui
+LoadingFrame.Size = UDim2.new(0, 460, 0, 260)
+LoadingFrame.Position = UDim2.new(0.5, -230, 0.5, -130)
+LoadingFrame.BackgroundColor3 = Colors.Background
+LoadingFrame.BorderSizePixel = 0
+LoadingFrame.ZIndex = 60000
+
+local LoadingCorner = Instance.new("UICorner")
+LoadingCorner.CornerRadius = UDim.new(0, 10)
+LoadingCorner.Parent = LoadingFrame
+
+local LoadingStroke = Instance.new("UIStroke")
+LoadingStroke.Color = Colors.Border
+LoadingStroke.Thickness = 1
+LoadingStroke.Parent = LoadingFrame
+
+local loadSnow = Instance.new("Frame")
+loadSnow.Name = "LoadSnow"
+loadSnow.Parent = LoadingFrame
+loadSnow.Size = UDim2.new(1, 0, 1, 0)
+loadSnow.BackgroundTransparency = 1
+loadSnow.ZIndex = 0
+
 task.spawn(function()
     while LoadingFrame and LoadingFrame.Parent do
         local size = wRNG:NextNumber(2, 4)
-        local fl = Create("Frame", {
-            Parent = loadSnow,
-            Size = UDim2.new(0, size, 0, size),
-            BackgroundColor3 = Color3.fromRGB(255, 255, 255),
-            BackgroundTransparency = wRNG:NextNumber(0.4, 0.8),
-            BorderSizePixel = 0,
-            Position = UDim2.new(wRNG:NextNumber(0, 1), 0, -0.05, 0)
-        })
-        Create("UICorner", { Parent = fl, CornerRadius = UDim.new(1, 0) })
-        Services.TS:Create(fl, TweenInfo.new(wRNG:NextNumber(3, 7), Enum.EasingStyle.Linear), {Position = UDim2.new(fl.Position.X.Scale + wRNG:NextNumber(-0.1, 0.1), 0, 1.05, 0)}):Play()
+        local fl = Instance.new("Frame")
+        fl.Parent = loadSnow
+        fl.Size = UDim2.new(0, size, 0, size)
+        fl.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        fl.BackgroundTransparency = wRNG:NextNumber(0.4, 0.8)
+        fl.BorderSizePixel = 0
+        fl.Position = UDim2.new(wRNG:NextNumber(0, 1), 0, -0.05, 0)
+        fl.ZIndex = 0
+
+        local flCorner = Instance.new("UICorner")
+        flCorner.CornerRadius = UDim.new(1, 0)
+        flCorner.Parent = fl
+
+        TweenService:Create(fl, TweenInfo.new(wRNG:NextNumber(3, 7), Enum.EasingStyle.Linear), {
+            Position = UDim2.new(fl.Position.X.Scale + wRNG:NextNumber(-0.1, 0.1), 0, 1.05, 0)
+        }):Play()
+
+        task.delay(7, function()
+            if fl and fl.Parent then fl:Destroy() end
+        end)
+
         task.wait(0.3)
     end
 end)
 
-local LoadingTitle = Create("TextLabel", {
-    Parent = LoadingFrame,
-    Size = UDim2.new(1, 0, 0, 40),
-    Position = UDim2.new(0, 0, 0.55, -20),
-    BackgroundTransparency = 1,
-    Text = "SEPTUS HUB",
-    Font = Enum.Font.GothamBlack,
-    TextSize = 28,
-    TextColor3 = Colors.Active,
-    ZIndex = 1
-})
+local LoadingText = Instance.new("TextLabel")
+LoadingText.Parent = LoadingFrame
+LoadingText.AnchorPoint = Vector2.new(0.5, 0.5)
+LoadingText.Position = UDim2.new(0.5, 0, 0.45, 0)
+LoadingText.Size = UDim2.new(0, 320, 0, 60)
+LoadingText.BackgroundTransparency = 1
+LoadingText.Text = "SEPTUS HUB"
+LoadingText.TextColor3 = Color3.fromRGB(255, 255, 255)
+LoadingText.Font = Enum.Font.GothamBlack
+LoadingText.TextSize = 36
+LoadingText.TextTransparency = 1
+LoadingText.ZIndex = 2
 
-local LoadingLogo = Create("ImageLabel", {
-    Parent = LoadingFrame,
-    Size = UDim2.new(0, 70, 0, 70),
-    Position = UDim2.new(0.5, -35, 0.35, -45),
-    BackgroundTransparency = 1,
-    Image = _G.NotificationAssetID,
-    ZIndex = 1
-})
-Create("UICorner", { Parent = LoadingLogo, CornerRadius = UDim.new(0, 8) })
+local LoadingSub = Instance.new("TextLabel")
+LoadingSub.Parent = LoadingFrame
+LoadingSub.AnchorPoint = Vector2.new(0.5, 0.5)
+LoadingSub.Position = UDim2.new(0.5, 0, 0.56, 0)
+LoadingSub.Size = UDim2.new(0, 300, 0, 40)
+LoadingSub.BackgroundTransparency = 1
+LoadingSub.Text = "Loading interface..."
+LoadingSub.TextColor3 = Color3.fromRGB(180, 180, 180)
+LoadingSub.Font = Enum.Font.Gotham
+LoadingSub.TextSize = 16
+LoadingSub.TextTransparency = 1
+LoadingSub.ZIndex = 2
 
-local LoadingBarBG = Create("Frame", {
-    Parent = LoadingFrame,
-    Size = UDim2.new(0, 220, 0, 6),
-    Position = UDim2.new(0.5, -110, 0.72, 0),
-    BackgroundColor3 = Colors.ToggleShell,
-    BorderSizePixel = 0,
-    ZIndex = 1
-})
-Create("UICorner", { Parent = LoadingBarBG })
+local Glow = Instance.new("ImageLabel")
+Glow.Parent = LoadingFrame
+Glow.AnchorPoint = Vector2.new(0.5, 0.5)
+Glow.Position = UDim2.new(0.5, 0, 0.5, 0)
+Glow.Size = UDim2.new(0, 210, 0, 210)
+Glow.BackgroundTransparency = 1
+Glow.Image = "rbxassetid://5028857084"
+Glow.ImageColor3 = Color3.fromRGB(255, 255, 255)
+Glow.ImageTransparency = 1
+Glow.ZIndex = 1
 
-local LoadingBar = Create("Frame", {
-    Parent = LoadingBarBG,
-    Size = UDim2.new(0, 0, 1, 0),
-    BackgroundColor3 = Colors.Active,
-    BorderSizePixel = 0,
-    ZIndex = 2
-})
-Create("UICorner", { Parent = LoadingBar })
+local BarBack = Instance.new("Frame")
+BarBack.Parent = LoadingFrame
+BarBack.AnchorPoint = Vector2.new(0.5, 0.5)
+BarBack.Position = UDim2.new(0.5, 0, 0.65, 0)
+BarBack.Size = UDim2.new(0, 180, 0, 6)
+BarBack.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+BarBack.BorderSizePixel = 0
+BarBack.ZIndex = 2
 
-local barTween = Services.TS:Create(LoadingBar, TweenInfo.new(3.5, Enum.EasingStyle.Linear), {Size = UDim2.new(1, 0, 1, 0)})
+local BarBackCorner = Instance.new("UICorner")
+BarBackCorner.CornerRadius = UDim.new(1, 0)
+BarBackCorner.Parent = BarBack
+
+local Bar = Instance.new("Frame")
+Bar.Parent = BarBack
+Bar.Size = UDim2.new(0, 0, 1, 0)
+Bar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+Bar.BorderSizePixel = 0
+Bar.ZIndex = 3
+
+local BarCorner = Instance.new("UICorner")
+BarCorner.CornerRadius = UDim.new(1, 0)
+BarCorner.Parent = Bar
+
+TweenService:Create(Blur, TweenInfo.new(0.8), { Size = 24 }):Play()
+TweenService:Create(LoadingText, TweenInfo.new(1), { TextTransparency = 0 }):Play()
+TweenService:Create(LoadingSub, TweenInfo.new(1), { TextTransparency = 0 }):Play()
+TweenService:Create(Glow, TweenInfo.new(1), { ImageTransparency = 0.35 }):Play()
+
+local barTween = TweenService:Create(Bar, TweenInfo.new(3.5, Enum.EasingStyle.Linear), { Size = UDim2.new(1, 0, 1, 0) })
 barTween:Play()
+
+task.spawn(function()
+    while LoadingFrame and LoadingFrame.Parent do  
+        TweenService:Create(  
+            Glow,  
+            TweenInfo.new(1.5),  
+            {  
+                Rotation = Glow.Rotation + 25,  
+                ImageTransparency = 0.55  
+            }  
+        ):Play()  
+
+        task.wait(1.5)  
+
+        TweenService:Create(  
+            Glow,  
+            TweenInfo.new(1.5),  
+            {  
+                ImageTransparency = 0.3  
+            }  
+        ):Play()  
+
+        task.wait(1.5)  
+    end
+end)
+
 barTween.Completed:Wait()
 
-local fadeTween = Services.TS:Create(LoadingFrame, TWEEN_INFO_SMOOTH, {BackgroundTransparency = 1})
-Services.TS:Create(LoadingTitle, TWEEN_INFO_FAST, {TextTransparency = 1}):Play()
-Services.TS:Create(LoadingBarBG, TWEEN_INFO_FAST, {BackgroundTransparency = 1}):Play()
-Services.TS:Create(LoadingBar, TWEEN_INFO_FAST, {BackgroundTransparency = 1}):Play()
-Services.TS:Create(LoadingLogo, TWEEN_INFO_FAST, {ImageTransparency = 1}):Play()
+local fadeTween = TweenService:Create(LoadingFrame, TweenInfo.new(1), { BackgroundTransparency = 1 })
+TweenService:Create(LoadingText, TweenInfo.new(1), { TextTransparency = 1 }):Play()
+TweenService:Create(LoadingSub, TweenInfo.new(1), { TextTransparency = 1 }):Play()
+TweenService:Create(Glow, TweenInfo.new(1), { ImageTransparency = 1 }):Play()
+TweenService:Create(Blur, TweenInfo.new(1), { Size = 0 }):Play()
+TweenService:Create(LoadingStroke, TweenInfo.new(1), { Transparency = 1 }):Play()
+
+for _, flake in ipairs(loadSnow:GetChildren()) do
+    if flake:IsA("Frame") then
+        TweenService:Create(flake, TweenInfo.new(1), { BackgroundTransparency = 1 }):Play()
+    end
+end
+
 fadeTween:Play()
 fadeTween.Completed:Wait()
+
 LoadingFrame:Destroy()
+Blur:Destroy()
+
 _G.MainMenuLoaded = true
 
 UI.Frame = Create("Frame", {
@@ -787,7 +882,7 @@ local TitleText = Create("TextLabel", {
 local VersionBadge = Create("Frame", { Parent = TitleContainer, Size = UDim2.new(0, 48, 0, 18), BackgroundColor3 = Colors.Surface, LayoutOrder = 2 })
 Create("UICorner", { Parent = VersionBadge, CornerRadius = UDim.new(0, 4) })
 Create("UIStroke", { Parent = VersionBadge, Color = Colors.Border, Thickness = 1 })
-local VersionTag = Create("TextLabel", { Parent = VersionBadge, Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, Text = "V2.32", TextColor3 = Colors.Active, Font = Enum.Font.GothamSemibold, TextSize = 10 })
+local VersionTag = Create("TextLabel", { Parent = VersionBadge, Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1, Text = "V2.33", TextColor3 = Colors.Active, Font = Enum.Font.GothamSemibold, TextSize = 10 })
 
 local Controls = Create("Frame", { Parent = TopBar, AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -15, 0.5, 0), Size = UDim2.new(0, 70, 1, 0), BackgroundTransparency = 1 })
 Create("UIListLayout", { Parent = Controls, FillDirection = Enum.FillDirection.Horizontal, HorizontalAlignment = Enum.HorizontalAlignment.Right, VerticalAlignment = Enum.VerticalAlignment.Center, SortOrder = Enum.SortOrder.LayoutOrder, Padding = UDim.new(0, 10) })
@@ -2481,7 +2576,7 @@ do
         diffOpened = not diffOpened
         DiffMenu.Visible = true
         Services.TS:Create(DiffArrow, TWEEN_INFO_FAST, {Rotation = diffOpened and 180 or 0}):Play()
-        local t = Services.TS:Create(DiffMenu, TWEEN_INFO_FAST, {Size = UDim2.new(1, -6, 0, diffOpened and 264 or 0)})
+        local t = Services.TS:Create(DiffMenu, TWEEN_INFO_FAST, {Size = UDim2.new(1, -6, 0, diffOpened and 352 or 0)})
         t:Play(); t.Completed:Wait(); updateMiscPositions()
     end)
 
@@ -2689,6 +2784,150 @@ do
             cinemPart.CFrame = cinemPart.CFrame + (moveDir * 1.5)
         end
     end))
+
+    createToggle(DiffMenu, "BunnyHop", 264, false, function(st)
+        _G.BhopEnabled = st
+    end)
+
+    local bhSettingsCard = CreateStyledCard(DiffMenu, 40)
+    bhSettingsCard.Position = UDim2.new(0, 0, 0, 308)
+    local bhSettingsLbl = Create("TextLabel", {
+        Parent = bhSettingsCard,
+        Size = UDim2.new(1, -60, 1, 0),
+        Position = UDim2.new(0, 12, 0, 0),
+        BackgroundTransparency = 1,
+        Text = "BunnyHop Settings",
+        TextColor3 = Colors.TextMain,
+        Font = Enum.Font.GothamMedium,
+        TextSize = 13,
+        TextXAlignment = Enum.TextXAlignment.Left
+    })
+    local bhOpenBtn = Create("TextButton", {
+        Parent = bhSettingsCard,
+        Size = UDim2.new(0, 60, 0, 24),
+        Position = UDim2.new(1, -72, 0.5, -12),
+        BackgroundColor3 = Colors.Active,
+        Text = "Open",
+        TextColor3 = Colors.Background,
+        Font = Enum.Font.GothamBold,
+        TextSize = 11,
+        BorderSizePixel = 0
+    })
+    Create("UICorner", { Parent = bhOpenBtn, CornerRadius = UDim.new(0, 4) })
+
+    _G.BhopEnabled = false
+    _G.BhopAutoJump = true
+    _G.BhopAirStrafe = true
+    _G.BhopMaxSpeed = 100
+    _G.BhopRealistic = false
+
+    local BhopWin, BhopClose, BhopScroll, BhopLayout, BhopActionBtn, BhopActionLbl = createFloatingMenu("BunnyHop Settings", 280, 280)
+    BhopActionBtn.Visible = false
+    BhopActionLbl.Visible = false
+    BhopScroll.Size = UDim2.new(1, -20, 1, -48)
+
+    createToggle(BhopScroll, "Auto Jump", 0, _G.BhopAutoJump, function(st)
+        _G.BhopAutoJump = st
+    end)
+
+    createToggle(BhopScroll, "Air Strafe", 0, _G.BhopAirStrafe, function(st)
+        _G.BhopAirStrafe = st
+    end)
+
+    createSlider(BhopScroll, 0, "Max Speed", 16, 300, _G.BhopMaxSpeed, function(val)
+        _G.BhopMaxSpeed = val
+    end)
+
+    createToggle(BhopScroll, "Realistic Bhop", 0, _G.BhopRealistic, function(st)
+        _G.BhopRealistic = st
+    end)
+
+    bhOpenBtn.MouseButton1Click:Connect(function()
+        BhopWin.Visible = not BhopWin.Visible
+    end)
+    BhopClose.MouseButton1Click:Connect(function()
+        BhopWin.Visible = false
+    end)
+
+    local wasBhopEnabled = false
+    local lastOnGround = true
+    local speedAccumulator = 16
+    local hasJumpedThisLanding = false
+
+    local bhopConnection = Services.Run.Heartbeat:Connect(function(dt)
+        if not _G.BhopEnabled then
+            if wasBhopEnabled then
+                wasBhopEnabled = false
+                local hum = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
+                if hum then
+                    hum.WalkSpeed = _G.ConfigState["Speed"] or 16
+                end
+            end
+            return
+        end
+        wasBhopEnabled = true
+
+        local char = LP.Character
+        if not char then return end
+        local root = char:FindFirstChild("HumanoidRootPart")
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if not root or not hum or hum.Health <= 0 then return end
+
+        local onGround = (hum.FloorMaterial ~= Enum.Material.Air)
+        local wishDir = hum.MoveDirection
+        local currentVel = root.Velocity
+        local horizontalVel = Vector3.new(currentVel.X, 0, currentVel.Z)
+        local speed = horizontalVel.Magnitude
+
+        local spaceHeld = Services.UIS:IsKeyDown(Enum.KeyCode.Space)
+        if _G.BhopAutoJump and spaceHeld then
+            if onGround and not hasJumpedThisLanding then
+                hum:ChangeState(Enum.HumanoidStateType.Jumping)
+                hasJumpedThisLanding = true
+            end
+        end
+        if not onGround then
+            hasJumpedThisLanding = false
+        end
+
+        local maxSpeed = _G.BhopMaxSpeed or 100
+        local baseWalkSpeed = _G.ConfigState["Speed"] or 16
+
+        if onGround then
+            if not lastOnGround then
+
+                if spaceHeld and _G.BhopEnabled then
+                    if not _G.BhopRealistic then
+
+                        local boost = 3
+                        speedAccumulator = math.min(speedAccumulator + boost, maxSpeed)
+                        local dir = wishDir.Magnitude > 0 and wishDir.Unit or (horizontalVel.Magnitude > 0 and horizontalVel.Unit or root.CFrame.LookVector)
+                        horizontalVel = dir * speedAccumulator
+                        root.Velocity = Vector3.new(horizontalVel.X, root.Velocity.Y, horizontalVel.Z)
+                    else
+
+                        speedAccumulator = math.min(speed, maxSpeed)
+                    end
+                else
+                    speedAccumulator = baseWalkSpeed
+                end
+            else
+
+                if wishDir.Magnitude > 0 then
+                    speedAccumulator = math.max(baseWalkSpeed, speed)
+                else
+                    speedAccumulator = baseWalkSpeed
+                end
+            end
+        else
+
+            if wishDir.Magnitude > 0 then
+                wishDir = wishDir.Unit
+                if _G.BhopAirStrafe then
+                    if _G.BhopRealistic then
+
+                        local airAccelerate = 150 
+                        local wishspeed = 30 
 
     local ConsoleWin = Create("Frame", { Parent = UI.Screen, Size = UDim2.new(0, 440, 0, 240), Position = UDim2.new(0.5, -220, 0.5, -120), BackgroundColor3 = Colors.Background, BorderSizePixel = 0, Visible = false, ClipsDescendants = true })
     Create("UICorner", { Parent = ConsoleWin, CornerRadius = UDim.new(0, 8) })
