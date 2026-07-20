@@ -13,7 +13,7 @@
 - [ ] BunnyHop function in misc
 - [ ] Optimization
 - [ ] Fixing music playback in Music Player
-- [ ] Changing Remotespy optimized for PC injectors
+- [ ] Visually modified loading screen
 
 ## 💬 Telegram
 
